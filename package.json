@@ -1,0 +1,24 @@
+{
+  "name": "hiregcians",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "@tailwindcss/vite": "^4.2.4",
+    "pdfjs-dist": "^3.11.174",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.32",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.6",
+    "supabase": "^2.98.2",
+    "vite": "^8.0.10"
+  }
+}
