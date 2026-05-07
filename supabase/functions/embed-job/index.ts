@@ -13,7 +13,8 @@ serve(async (req) => {
   try {
     const { studentId, jobId, studentSkills, jobSkills, jobTitle } = await req.json()
     
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+    const GEMINI_API_KEY =
+      Deno.env.get('GEMINI_API_KEY') || Deno.env.get('VITE_GEMINI_API_KEY')
     
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY not configured')
@@ -23,7 +24,7 @@ serve(async (req) => {
       throw new Error('studentSkills and jobSkills are required')
     }
 
-    const result = await callGeminiForMatch(studentSkills, jobSkills, jobTitle, GEMINI_API_KEY)
+    const result = await callGeminiForMatch(studentSkills, jobSkills, jobTitle || 'Job opening', GEMINI_API_KEY)
     
     return new Response(
       JSON.stringify(result),
@@ -44,18 +45,7 @@ async function callGeminiForMatch(
   jobTitle: string,
   apiKey: string
 ) {
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `You are a recruitment AI. Calculate a match score for this student and job.
+  const data = await generateWithGemini(`You are a recruitment AI. Calculate a match score for this student and job.
 
 Student Skills: ${studentSkills.join(', ')}
 Job Title: ${jobTitle}
@@ -65,21 +55,7 @@ Return ONLY valid JSON, no other text:
 {
   "score": <number between 0 and 100>,
   "rationale": "<2-3 sentence explanation of why this student is or isn't a good fit>"
-}`
-          }]
-        }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 300 }
-      })
-    }
-  )
-
-  const data = await response.json()
-
-  console.log('Gemini match status:', response.status)
-  if (!response.ok) {
-    console.error('Gemini error:', JSON.stringify(data))
-    throw new Error(`Gemini API error: ${data.error?.message || 'Unknown'}`)
-  }
+}`, apiKey)
 
   let text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
   text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
@@ -106,4 +82,45 @@ function calculateSimpleMatch(studentSkills: string[], jobSkills: string[]): num
     jobSkills.some(js => js.toLowerCase() === s.toLowerCase())
   )
   return Math.round((matched.length / jobSkills.length) * 100)
+}
+
+async function generateWithGemini(prompt: string, apiKey: string) {
+  const models = [
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash',
+  ]
+  const errors: string[] = []
+
+  for (const model of models) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 300,
+            responseMimeType: 'application/json',
+          }
+        })
+      }
+    )
+
+    const data = await response.json()
+    console.log(`Gemini match status (${model}):`, response.status)
+    if (response.ok) return data
+
+    const message = data.error?.message || 'Unknown'
+    errors.push(`${model}: ${message}`)
+    console.error(`Gemini error from ${model}:`, JSON.stringify(data))
+  }
+
+  throw new Error(`Gemini API error: ${errors.join(' | ')}`)
 }

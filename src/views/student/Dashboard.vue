@@ -46,7 +46,7 @@
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 280px;gap:1rem">
+      <div class="dashboard-layout">
         <div>
           <div class="section-head">
             Recommended for you 
@@ -116,6 +116,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useApplicationsStore } from '@/stores/applications'
 import { supabase } from '@/api/supabase'
+import { computeMatchesForStudent } from '@/api/matching'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -194,6 +195,45 @@ const applyForJob = async (job) => {
   }
 }
 
+const loadMatchedJobs = async () => {
+  const { data: matches, error } = await supabase
+    .from('match_scores')
+    .select(`
+      score,
+      job:job_id (
+        id,
+        title,
+        employer_id,
+        required_skills,
+        posted_at,
+        status
+      )
+    `)
+    .eq('student_id', authStore.user.id)
+    .order('score', { ascending: false })
+    .limit(10)
+
+  if (error) throw error
+  if (!matches?.length) return []
+
+  const employerIds = [...new Set(matches.map(m => m.job?.employer_id).filter(Boolean))]
+  const { data: employers } = employerIds.length
+    ? await supabase
+      .from('employer_profiles')
+      .select('user_id, company_name')
+      .in('user_id', employerIds)
+    : { data: [] }
+  const employerMap = new Map((employers || []).map(e => [e.user_id, e.company_name]))
+
+  return matches
+    .filter(m => m.job)
+    .map(m => ({
+      ...m.job,
+      company_name: employerMap.get(m.job.employer_id) || 'Gordon College Partner',
+      match_score: m.score
+    }))
+}
+
 const fetchData = async () => {
   loading.value = true
   try {
@@ -208,28 +248,17 @@ const fetchData = async () => {
       section.value = studentData.section || ''
       skills.value = studentData.skills || []
     }
-    
-    const { data: matches } = await supabase
-      .from('match_scores')
-      .select(`
-        score,
-        job:job_id (
-          id,
-          title,
-          company_name,
-          required_skills
-        )
-      `)
-      .eq('student_id', authStore.user.id)
-      .order('score', { ascending: false })
-      .limit(10)
-    
-    if (matches && matches.length > 0) {
-      recommendedJobs.value = matches.map(m => ({
-        ...m.job,
-        match_score: m.score
-      }))
-      topMatchScore.value = Math.round((matches[0].score || 0) * 100)
+
+    let matchedJobs = await loadMatchedJobs()
+
+    if (!matchedJobs.length && skills.value.length) {
+      await computeMatchesForStudent(authStore.user.id)
+      matchedJobs = await loadMatchedJobs()
+    }
+
+    if (matchedJobs.length > 0) {
+      recommendedJobs.value = matchedJobs
+      topMatchScore.value = Math.round((matchedJobs[0].match_score || 0) * 100)
     } else {
       const { data: jobs } = await supabase
         .from('jobs')
@@ -270,4 +299,16 @@ onMounted(() => {
 .pct-low { background: #F1EFE8; color: var(--gc-muted); }
 .pct-mid { background: #C0DD97; color: #27500A; }
 .pct-high { background: var(--gc-green); color: #fff; }
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

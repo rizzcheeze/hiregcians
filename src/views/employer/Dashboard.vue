@@ -259,23 +259,25 @@ const fetchDashboardData = async () => {
         .in('job_id', jobIds)
         .order('applied_at', { ascending: false })
         .limit(5)
+
+      const jobIdsForApps = [...new Set((recentApps || []).map(a => a.job_id).filter(Boolean))]
+      const { data: jobsForApps } = jobIdsForApps.length
+        ? await supabase
+          .from('jobs')
+          .select('id, title')
+          .in('id', jobIdsForApps)
+        : { data: [] }
+      const jobMap = new Map(jobsForApps?.map(j => [j.id, j]) || [])
       
       if (recentApps && recentApps.length > 0) {
         const studentIds = [...new Set(recentApps.map(a => a.student_id))]
-        const jobIdsForApps = [...new Set(recentApps.map(a => a.job_id))]
         
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, first_name, last_name')
           .in('id', studentIds)
-        
-        const { data: jobsForApps } = await supabase
-          .from('jobs')
-          .select('id, title')
-          .in('id', jobIdsForApps)
-        
+
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
-        const jobMap = new Map(jobsForApps?.map(j => [j.id, j]) || [])
         
         recentApplicants.value = recentApps.map(app => ({
           id: app.id,

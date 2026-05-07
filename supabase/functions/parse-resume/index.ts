@@ -11,11 +11,13 @@ serve(async (req) => {
   }
 
   try {
-    const { text } = await req.json()
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    
+    const body = await req.json()
+    const text = typeof body.text === 'string' ? body.text.trim() : ''
+    const GEMINI_API_KEY =
+      Deno.env.get('GEMINI_API_KEY') || Deno.env.get('VITE_GEMINI_API_KEY')
+
     if (!GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY not configured')
+      throw new Error('GEMINI_API_KEY not configured in Supabase Edge Function secrets')
     }
     if (!text || text.length < 50) {
       throw new Error('Insufficient text extracted')
@@ -26,7 +28,7 @@ serve(async (req) => {
 Resume:
 ${text.substring(0, 3000)}
 
-Required JSON format:
+Return this JSON shape:
 {
   "skills": ["skill1", "skill2", "skill3"],
   "achievements": ["achievement1", "achievement2"],
@@ -34,30 +36,16 @@ Required JSON format:
   "recruiterTip": "One actionable tip"
 }`
 
-    const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 800 }
-      })
-    })
+    const geminiData = await generateWithGemini(prompt, GEMINI_API_KEY)
 
-    const geminiData = await geminiResponse.json()
-    
-    if (!geminiResponse.ok) {
-      console.error('Gemini error:', JSON.stringify(geminiData))
-      throw new Error(`Gemini API error: ${geminiData.error?.message || 'Unknown error'}`)
+    const resultText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!resultText) {
+      console.error('Unexpected Gemini response:', JSON.stringify(geminiData))
+      throw new Error('Gemini returned no parseable text')
     }
 
-    let resultText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-    resultText = resultText.replace(/```json\n?/g, '').replace(/```\n?/g, '').replace(/```/g, '').trim()
-    
-    const parsed = JSON.parse(resultText)
-    
+    const parsed = parseJsonObject(resultText)
+
     const skills = Array.isArray(parsed.skills) ? parsed.skills : []
     const achievements = Array.isArray(parsed.achievements) ? parsed.achievements : []
     const summary = parsed.summary || ''
@@ -75,3 +63,62 @@ Required JSON format:
     )
   }
 })
+
+async function generateWithGemini(prompt: string, apiKey: string) {
+  const models = [
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash',
+  ]
+  const errors: string[] = []
+
+  for (const model of models) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 800,
+            responseMimeType: 'application/json',
+          },
+        }),
+      }
+    )
+
+    const data = await response.json()
+    if (response.ok) return data
+
+    const message = data.error?.message || 'Unknown error'
+    errors.push(`${model}: ${message}`)
+    console.error(`Gemini error from ${model}:`, JSON.stringify(data))
+  }
+
+  throw new Error(`Gemini API error: ${errors.join(' | ')}`)
+}
+
+function parseJsonObject(value: string) {
+  const cleaned = value
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .replace(/```/g, '')
+    .trim()
+
+  try {
+    return JSON.parse(cleaned)
+  } catch (_) {
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error('Gemini did not return valid JSON')
+    }
+    return JSON.parse(cleaned.slice(start, end + 1))
+  }
+}

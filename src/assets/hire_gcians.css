@@ -835,3 +835,224 @@ body {
         padding: 0;
     }
 }
+
+/* Broad device-fit overrides for pages that use local scoped layout CSS. */
+@media (max-width: 900px) {
+    html,
+    body,
+    #app {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    .dash {
+        display: block !important;
+        min-width: 0 !important;
+    }
+
+    .sidebar {
+        position: static !important;
+        height: auto !important;
+        max-height: none !important;
+        transform: none !important;
+        border-radius: 0 !important;
+        overflow: visible !important;
+    }
+
+    .sidebar-toggle {
+        display: none !important;
+    }
+
+    .main {
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 1rem !important;
+        overflow-x: hidden !important;
+    }
+
+    .main-header,
+    .jobs-header,
+    .filters-bar,
+    .search-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+    }
+
+    .layout,
+    .content,
+    .dashboard-layout,
+    .dashboard-grid,
+    .dashboard-layout,
+    .settings-layout,
+    .metrics-grid,
+    .stats-row,
+    .form-row {
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .metrics {
+        grid-template-columns: 1fr !important;
+    }
+
+    .card,
+    .profile-card,
+    .form-card,
+    .preview-card,
+    .detail-panel,
+    .filters,
+    .jobs-col {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .job-card,
+    .app-card,
+    .job-row {
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .job-right,
+    .app-right,
+    .jr-top {
+        align-items: flex-start !important;
+    }
+
+    .search-input,
+    .filter-select,
+    .form-input,
+    .form-select,
+    .form-textarea,
+    input,
+    select,
+    textarea {
+        max-width: 100% !important;
+    }
+
+    .table-header {
+        display: none !important;
+    }
+
+    .table-row {
+        grid-template-columns: 1fr !important;
+        gap: 0.5rem !important;
+        padding: 1rem !important;
+    }
+
+    .apps-table,
+    .jobs-table,
+    .logs-table,
+    .employers-table {
+        min-width: 0 !important;
+        overflow-x: visible !important;
+    }
+}
+
+@media (max-width: 520px) {
+    .main {
+        padding: 0.75rem !important;
+    }
+
+    .page-title,
+    .main-title,
+    .dp-title {
+        font-size: 1.25rem !important;
+        line-height: 1.2 !important;
+    }
+
+    .metric,
+    .card,
+    .profile-card,
+    .form-card,
+    .preview-card,
+    .job-card,
+    .app-card,
+    .job-row {
+        padding: 0.85rem !important;
+    }
+
+    .s-nav li {
+        padding: 0.7rem 1rem !important;
+    }
+}
+
+.global-sidebar-toggle,
+.global-sidebar-overlay {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    html body .global-sidebar-toggle {
+        position: fixed;
+        top: 0.85rem;
+        right: 0.85rem;
+        z-index: 1002;
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 12px;
+        background: var(--gc-green);
+        color: #fff;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        box-shadow: 0 12px 28px rgba(26, 46, 10, 0.24);
+        cursor: pointer;
+    }
+
+    html body .global-sidebar-toggle span {
+        width: 18px;
+        height: 2px;
+        border-radius: 999px;
+        background: #fff;
+        display: block;
+    }
+
+    html body .global-sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 998;
+        display: block;
+        background: rgba(26, 46, 10, 0.34);
+    }
+
+    .sidebar-toggle {
+        display: none !important;
+    }
+
+    html body .dash {
+        display: block !important;
+        min-height: 100vh !important;
+    }
+
+    html body .dash .sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: auto !important;
+        bottom: 0 !important;
+        width: min(82vw, 286px) !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        z-index: 1001 !important;
+        transform: translateX(-105%) !important;
+        transition: transform 0.22s ease !important;
+        border-radius: 0 !important;
+        overflow-y: auto !important;
+        box-shadow: 20px 0 50px rgba(26, 46, 10, 0.22);
+    }
+
+    html body.sidebar-open .dash .sidebar {
+        transform: translateX(0) !important;
+    }
+
+    html body .main {
+        padding-top: 4.25rem !important;
+    }
+}

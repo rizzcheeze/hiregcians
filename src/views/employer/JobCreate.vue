@@ -142,6 +142,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/api/supabase'
+import { computeMatchesForJob } from '@/api/matching'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -223,6 +224,11 @@ const createJob = async () => {
       .select()
 
     if (error) throw error
+
+    const job = Array.isArray(data) ? data[0] : data
+    if (job?.id) {
+      await computeMatchesForJob(job.id)
+    }
 
     alert('Job posted successfully!')
     router.push('/employer/jobs')

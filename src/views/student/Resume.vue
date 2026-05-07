@@ -90,6 +90,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/api/supabase'
+import { computeMatchesForStudent } from '@/api/matching'
 import * as pdfjsLib from 'pdfjs-dist'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`
@@ -190,12 +191,15 @@ const uploadResume = async () => {
 
     await supabase.from('student_profiles').update({ skills: data.skills }).eq('user_id', authStore.user.id)
 
+    uploadStatus.value = 'Computing job match scores...'
+    await computeMatchesForStudent(authStore.user.id)
+
     extractedSkills.value = data.skills
     achievements.value = data.achievements
     aiSummary.value = data.summary
     recruiterTip.value = data.recruiterTip
 
-    uploadStatus.value = 'Success!'
+    uploadStatus.value = 'Success! Job match scores are ready.'
     uploadSuccess.value = true
   } catch (error) {
     console.error(error)

@@ -84,3 +84,25 @@ export async function getRationale(studentId, jobId) {
   if (error && error.code !== 'PGRST116') throw error
   return data ?? null
 }
+
+// Compute and store percentage match scores for one student across all active jobs.
+export async function computeMatchesForStudent(studentId) {
+  const { data, error } = await supabase.functions.invoke('compute-matches', {
+    body: { student_id: studentId }
+  })
+  if (error || data?.success === false) {
+    throw new Error(data?.error || error?.message || 'Failed to compute match scores')
+  }
+  return data
+}
+
+// Compute and store percentage match scores for one job across all students with skills.
+export async function computeMatchesForJob(jobId) {
+  const { data, error } = await supabase.functions.invoke('compute-matches', {
+    body: { job_id: jobId }
+  })
+  if (error || data?.success === false) {
+    throw new Error(data?.error || error?.message || 'Failed to compute match scores')
+  }
+  return data
+}
