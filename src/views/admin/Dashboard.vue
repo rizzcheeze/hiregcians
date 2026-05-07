@@ -11,20 +11,20 @@
         </div>
       </div>
       <ul class="s-nav">
-  <li :class="{ active: $route.path === '/admin/dashboard' }" @click="$router.push('/admin/dashboard')">⬡ Overview</li>
-  <li :class="{ active: $route.path === '/admin/users' }" @click="$router.push('/admin/users')">⬡ Users</li>
-  <li :class="{ active: $route.path === '/admin/listings' }" @click="$router.push('/admin/listings')">⬡ All listings</li>
-  <li :class="{ active: $route.path === '/admin/applications' }" @click="$router.push('/admin/applications')">⬡ Applications</li>
-  <li :class="{ active: $route.path === '/admin/ai-logs' }" @click="$router.push('/admin/ai-logs')">⬡ AI match logs</li>
-  <div class="s-nav-label">Management</div>
-  <li :class="{ active: $route.path === '/admin/employers' }" @click="$router.push('/admin/employers')">⬡ Employers</li>
-  <li :class="{ active: $route.path === '/admin/announcements' }" @click="$router.push('/admin/announcements')">⬡ Announcements</li>
-  <li :class="{ active: $route.path === '/admin/reports' }" @click="$router.push('/admin/reports')">⬡ Reports</li>
-  <div class="s-nav-label">System</div>
-  <li :class="{ active: $route.path === '/admin/settings' }" @click="$router.push('/admin/settings')">⬡ Settings</li>
-  <li :class="{ active: $route.path === '/admin/audit-logs' }" @click="$router.push('/admin/audit-logs')">⬡ Audit logs</li>
-  <li @click="handleLogout">⬡ Logout</li>
-</ul>
+        <li :class="{ active: $route.path === '/admin/dashboard' }" @click="$router.push('/admin/dashboard')">⬡ Overview</li>
+        <li :class="{ active: $route.path === '/admin/users' }" @click="$router.push('/admin/users')">⬡ Users</li>
+        <li :class="{ active: $route.path === '/admin/listings' }" @click="$router.push('/admin/listings')">⬡ All listings</li>
+        <li :class="{ active: $route.path === '/admin/applications' }" @click="$router.push('/admin/applications')">⬡ Applications</li>
+        <li :class="{ active: $route.path === '/admin/ai-logs' }" @click="$router.push('/admin/ai-logs')">⬡ AI match logs</li>
+        <div class="s-nav-label">Management</div>
+        <li :class="{ active: $route.path === '/admin/employers' }" @click="$router.push('/admin/employers')">⬡ Employers</li>
+        <li :class="{ active: $route.path === '/admin/announcements' }" @click="$router.push('/admin/announcements')">⬡ Announcements</li>
+        <li :class="{ active: $route.path === '/admin/reports' }" @click="$router.push('/admin/reports')">⬡ Reports</li>
+        <div class="s-nav-label">System</div>
+        <li :class="{ active: $route.path === '/admin/settings' }" @click="$router.push('/admin/settings')">⬡ Settings</li>
+        <li :class="{ active: $route.path === '/admin/audit-logs' }" @click="$router.push('/admin/audit-logs')">⬡ Audit logs</li>
+        <li @click="handleLogout">⬡ Logout</li>
+      </ul>
     </aside>
 
     <main class="main">
@@ -62,7 +62,7 @@
         <div class="metric-card">
           <div class="metric-value">{{ stats.avgMatchScore }}%</div>
           <div class="metric-label">Avg. AI Match Score</div>
-          <div class="metric-change">↑ 2% vs last month</div>
+          <div class="metric-change">{{ stats.matchScoreChange }}</div>
         </div>
         <div class="metric-card">
           <div class="metric-value">{{ stats.hiredCount }}</div>
@@ -119,21 +119,24 @@
             <div class="card-header"><h3>Platform Health</h3></div>
             <div class="health-list">
               <div class="health-item"><span>Database Status</span><span class="health-value healthy">Operational</span></div>
-              <div class="health-item"><span>AI Service</span><span class="health-value healthy">Ready</span></div>
-              <div class="health-item"><span>Storage Usage</span><span>{{ storageUsage }}% used</span></div>
-              <div class="health-bar"><div class="health-fill" :style="{ width: storageUsage + '%' }"></div></div>
+              <div class="health-item"><span>AI Service</span><span class="health-value healthy">Active</span></div>
+              <div class="health-item"><span>Storage Usage</span><span>{{ storageUsage }} MB</span></div>
+              <div class="health-bar"><div class="health-fill" :style="{ width: Math.min((storageUsage / 100) * 100, 100) + '%' }"></div></div>
               <div class="health-item"><span>Active Sessions</span><span>{{ activeSessions }}</span></div>
             </div>
           </div>
 
           <div class="data-card">
-            <div class="card-header"><h3>System Alerts</h3></div>
+            <div class="card-header"><h3>Recent Activity</h3></div>
             <div class="alerts-list">
-              <div v-for="alert in alerts" :key="alert.id" class="alert-item">
-                <div class="alert-dot" :class="alert.type"></div>
-                <div class="alert-content"><div class="alert-title">{{ alert.title }}</div><div class="alert-time">{{ alert.time }}</div></div>
+              <div v-for="activity in recentActivities" :key="activity.id" class="alert-item">
+                <div class="alert-dot" :class="activity.type"></div>
+                <div class="alert-content">
+                  <div class="alert-title">{{ activity.title }}</div>
+                  <div class="alert-time">{{ activity.time }}</div>
+                </div>
               </div>
-              <div v-if="alerts.length === 0" class="empty-data">No new alerts</div>
+              <div v-if="recentActivities.length === 0" class="empty-data">No recent activity</div>
             </div>
           </div>
 
@@ -164,71 +167,275 @@ const authStore = useAuthStore()
 const sidebarOpen = ref(false)
 const recentUsers = ref([])
 const recentJobs = ref([])
-const alerts = ref([
-  { id: 1, title: 'Platform running normally', type: 'success', time: '2 hours ago' },
-  { id: 2, title: 'AI matching service active', type: 'success', time: '5 hours ago' }
-])
-const activeSessions = ref(42)
-const storageUsage = ref(23)
+const recentActivities = ref([])
+const activeSessions = ref(0)
+const storageUsage = ref(0)
 
 const stats = ref({
-  students: 0, employers: 0, activeJobs: 0, totalApplications: 0,
-  avgMatchScore: 0, hiredCount: 0, newStudents: 0, newEmployers: 0,
-  newJobs: 0, newApplications: 0, hiredThisMonth: 0
+  students: 0,
+  employers: 0,
+  activeJobs: 0,
+  totalApplications: 0,
+  avgMatchScore: 0,
+  hiredCount: 0,
+  newStudents: 0,
+  newEmployers: 0,
+  newJobs: 0,
+  newApplications: 0,
+  hiredThisMonth: 0,
+  matchScoreChange: '0%'
 })
 
-const getInitials = (name) => name ? name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : '?'
+const getInitials = (name) => {
+  if (!name) return '?'
+  return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2)
+}
+
 const getAvatarColor = (name) => {
   const colors = ['#3B6D11', '#639922', '#97C459', '#5F5E5A']
   return colors[(name?.length || 0) % colors.length]
 }
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
-const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
-const handleLogout = async () => { await authStore.logout(); router.push('/') }
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'Recently'
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} minutes ago`
+  if (diffHours < 24) return `${diffHours} hours ago`
+  if (diffDays < 7) return `${diffDays} days ago`
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const toggleSidebar = () => {
+  sidebarOpen.value = !sidebarOpen.value
+}
+
+const handleLogout = async () => {
+  await authStore.logout()
+  router.push('/')
+}
 
 const fetchDashboardData = async () => {
   try {
+    const now = new Date()
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    
+    const monthAgo = new Date()
+    monthAgo.setMonth(monthAgo.getMonth() - 1)
+    
+    const weekAgoStr = weekAgo.toISOString()
+    const monthAgoStr = monthAgo.toISOString()
+    
+    // Get all counts
     const { count: studentCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student')
     const { count: employerCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'employer')
     const { count: activeJobsCount } = await supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'active')
     const { count: applicationsCount } = await supabase.from('applications').select('*', { count: 'exact', head: true })
     const { count: hiredCount } = await supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'hired')
+    
+    // Get new users this week
+    const { count: newStudentsCount } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'student')
+      .gte('created_at', weekAgoStr)
+    
+    const { count: newEmployersCount } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'employer')
+      .gte('created_at', weekAgoStr)
+    
+    // Get new jobs this week
+    const { count: newJobsCount } = await supabase
+      .from('jobs')
+      .select('*', { count: 'exact', head: true })
+      .gte('posted_at', weekAgoStr)
+    
+    // Get new applications this week
+    const { count: newApplicationsCount } = await supabase
+      .from('applications')
+      .select('*', { count: 'exact', head: true })
+      .gte('applied_at', weekAgoStr)
+    
+    // Get hires this month
+    const { count: hiredThisMonthCount } = await supabase
+      .from('applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'hired')
+      .gte('reviewed_at', monthAgoStr)
+    
+    // Get match score average
     const { data: matchScores } = await supabase.from('match_scores').select('score')
     const avgScore = matchScores?.length ? Math.round(matchScores.reduce((a, b) => a + b.score, 0) / matchScores.length * 100) : 0
+    
+    // Get match score change
+    const { data: recentMatches } = await supabase
+      .from('match_scores')
+      .select('score, computed_at')
+      .gte('computed_at', monthAgoStr)
+    
+    const { data: olderMatches } = await supabase
+      .from('match_scores')
+      .select('score, computed_at')
+      .lt('computed_at', monthAgoStr)
+      .gte('computed_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+    
+    const recentAvg = recentMatches?.length ? recentMatches.reduce((a, b) => a + b.score, 0) / recentMatches.length * 100 : 0
+    const olderAvg = olderMatches?.length ? olderMatches.reduce((a, b) => a + b.score, 0) / olderMatches.length * 100 : 0
+    const matchScoreChange = recentAvg > olderAvg ? `↑ ${Math.round(recentAvg - olderAvg)}%` : recentAvg < olderAvg ? `↓ ${Math.round(olderAvg - recentAvg)}%` : '0%'
 
     stats.value = {
-      students: studentCount || 0, employers: employerCount || 0, activeJobs: activeJobsCount || 0,
-      totalApplications: applicationsCount || 0, avgMatchScore: avgScore, hiredCount: hiredCount || 0,
-      newStudents: Math.floor(Math.random() * 20), newEmployers: Math.floor(Math.random() * 5),
-      newJobs: Math.floor(Math.random() * 10), newApplications: Math.floor(Math.random() * 50),
-      hiredThisMonth: Math.floor(Math.random() * 15)
+      students: studentCount || 0,
+      employers: employerCount || 0,
+      activeJobs: activeJobsCount || 0,
+      totalApplications: applicationsCount || 0,
+      avgMatchScore: avgScore,
+      hiredCount: hiredCount || 0,
+      newStudents: newStudentsCount || 0,
+      newEmployers: newEmployersCount || 0,
+      newJobs: newJobsCount || 0,
+      newApplications: newApplicationsCount || 0,
+      hiredThisMonth: hiredThisMonthCount || 0,
+      matchScoreChange: matchScoreChange
     }
 
-    const { data: users } = await supabase.from('profiles').select('id, first_name, last_name, role, created_at').order('created_at', { ascending: false }).limit(5)
+    // Get recent users
+    const { data: users } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, role, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5)
+    
     recentUsers.value = await Promise.all((users || []).map(async (user) => {
       let programOrCompany = ''
       if (user.role === 'student') {
-        const { data: student } = await supabase.from('student_profiles').select('program').eq('user_id', user.id).maybeSingle()
+        const { data: student } = await supabase
+          .from('student_profiles')
+          .select('program')
+          .eq('user_id', user.id)
+          .maybeSingle()
         programOrCompany = student?.program || 'N/A'
       } else if (user.role === 'employer') {
-        const { data: employer } = await supabase.from('employer_profiles').select('company_name').eq('user_id', user.id).maybeSingle()
+        const { data: employer } = await supabase
+          .from('employer_profiles')
+          .select('company_name')
+          .eq('user_id', user.id)
+          .maybeSingle()
         programOrCompany = employer?.company_name || 'N/A'
       }
-      return { id: user.id, name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown', role: user.role, programOrCompany, created_at: user.created_at }
+      return {
+        id: user.id,
+        name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown',
+        role: user.role,
+        programOrCompany: programOrCompany,
+        created_at: user.created_at
+      }
     }))
 
-    const { data: jobs } = await supabase.from('jobs').select('id, title, employer_id, status, posted_at').order('posted_at', { ascending: false }).limit(5)
+    // Get recent jobs
+    const { data: jobs } = await supabase
+      .from('jobs')
+      .select('id, title, employer_id, status, posted_at')
+      .order('posted_at', { ascending: false })
+      .limit(5)
+    
     recentJobs.value = await Promise.all((jobs || []).map(async (job) => {
-      const { data: employer } = await supabase.from('employer_profiles').select('company_name').eq('user_id', job.employer_id).maybeSingle()
-      const { count: applicantCount } = await supabase.from('applications').select('*', { count: 'exact', head: true }).eq('job_id', job.id)
-      const { data: matchScores } = await supabase.from('match_scores').select('score').eq('job_id', job.id)
-      const avgMatch = matchScores?.length ? Math.round(matchScores.reduce((a, b) => a + b.score, 0) / matchScores.length * 100) : 0
-      return { id: job.id, title: job.title, employer_name: employer?.company_name || 'Unknown', applicant_count: applicantCount || 0, avg_match_score: avgMatch, status: job.status }
+      const { data: employer } = await supabase
+        .from('employer_profiles')
+        .select('company_name')
+        .eq('user_id', job.employer_id)
+        .maybeSingle()
+      
+      const { count: applicantCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('job_id', job.id)
+      
+      const { data: jobMatchScores } = await supabase
+        .from('match_scores')
+        .select('score')
+        .eq('job_id', job.id)
+      
+      const avgMatch = jobMatchScores?.length
+        ? Math.round(jobMatchScores.reduce((a, b) => a + b.score, 0) / jobMatchScores.length * 100)
+        : 0
+      
+      return {
+        id: job.id,
+        title: job.title,
+        employer_name: employer?.company_name || 'Unknown',
+        applicant_count: applicantCount || 0,
+        avg_match_score: avgMatch,
+        status: job.status
+      }
     }))
-  } catch (error) { console.error('Error fetching dashboard data:', error) }
+
+    // Get active sessions
+    const { count: activeCount } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', weekAgoStr)
+    
+    activeSessions.value = activeCount || 0
+    
+    // Get storage usage
+    const { data: storageFiles } = await supabase.storage
+      .from('resumes')
+      .list()
+    
+    const estimatedMB = (storageFiles?.length || 0) * 0.5
+    storageUsage.value = Math.round(estimatedMB)
+    
+    // Get recent activities
+    const { data: recentApps } = await supabase
+      .from('applications')
+      .select('id, applied_at, student_id, job_id')
+      .order('applied_at', { ascending: false })
+      .limit(5)
+    
+    if (recentApps && recentApps.length > 0) {
+      const studentIds = recentApps.map(a => a.student_id)
+      const jobIds = recentApps.map(a => a.job_id)
+      
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', studentIds)
+      
+      const { data: jobsData } = await supabase
+        .from('jobs')
+        .select('id, title')
+        .in('id', jobIds)
+      
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+      const jobMap = new Map(jobsData?.map(j => [j.id, j]) || [])
+      
+      recentActivities.value = recentApps.map(app => ({
+        id: app.id,
+        title: `${profileMap.get(app.student_id)?.first_name || 'A student'} applied for ${jobMap.get(app.job_id)?.title || 'a position'}`,
+        type: 'success',
+        time: formatDate(app.applied_at)
+      }))
+    } else {
+      recentActivities.value = []
+    }
+    
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error)
+  }
 }
 
-onMounted(() => { fetchDashboardData() })
+onMounted(() => {
+  fetchDashboardData()
+})
 </script>
 
 <style scoped>
@@ -247,7 +454,7 @@ onMounted(() => { fetchDashboardData() })
 .card-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid #EAF3DE; }
 .card-header h3 { font-size: 0.85rem; font-weight: 600; margin: 0; }
 .text-link { background: none; border: none; color: var(--gc-green-mid); font-size: 0.7rem; cursor: pointer; }
-.users-list, .jobs-list, .health-list, .alerts-list, .points-list { padding: 0.5rem; }
+.users-list, .jobs-list, .health-list, .alerts-list { padding: 0.5rem; }
 .user-item, .job-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-bottom: 1px solid #EAF3DE; }
 .user-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 500; }
 .user-details { flex: 1; }
@@ -273,6 +480,7 @@ onMounted(() => { fetchDashboardData() })
 .alert-item { display: flex; gap: 0.5rem; padding: 0.5rem; border-bottom: 1px solid #EAF3DE; align-items: flex-start; }
 .alert-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 0.3rem; }
 .alert-dot.success { background: var(--gc-green); }
+.alert-dot.warning { background: #F0D070; }
 .alert-title { font-size: 0.8rem; }
 .alert-time { font-size: 0.65rem; color: var(--gc-muted); margin-top: 0.2rem; }
 .talking-points { background: var(--gc-green-light); }
