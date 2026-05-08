@@ -38,12 +38,10 @@
 
         <div class="role-selector">
           <div class="role-card" :class="{ selected: signupRole === 'student' }" @click="signupRole = 'student'; showEmployerExtras = false">
-            <div class="role-icon">🎓</div>
             <div class="role-title">Student</div>
             <div class="role-sub">Browse & apply</div>
           </div>
           <div class="role-card" :class="{ selected: signupRole === 'employer' }" @click="signupRole = 'employer'; showEmployerExtras = true">
-            <div class="role-icon">🏢</div>
             <div class="role-title">Employer</div>
             <div class="role-sub">Post & hire</div>
           </div>
@@ -104,7 +102,7 @@
             style="margin-bottom: 0.5rem; padding-right: 2.5rem;"
           />
           <span class="pw-toggle" @click="showPassword = !showPassword">
-            {{ showPassword ? '🙈' : '👁️' }}
+            {{ showPassword ? 'Hide' : 'Show' }}
           </span>
         </div>
 
@@ -224,7 +222,11 @@ const handleSignup = async () => {
     return
   }
   if (!isPasswordValid.value) {
-    signupError.value = 'Password does not meet all requirements.'
+    signupError.value = 'Please make sure your password meets all requirements.'
+    return
+  }
+  if (strengthScore.value < 5) {
+    signupError.value = 'Password is too weak. Please use a stronger password.'
     return
   }
 
