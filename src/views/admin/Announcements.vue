@@ -151,10 +151,6 @@ const closeModal = () => {
   editingAnnouncement.value = null
   announcementForm.value = { title: '', content: '', audience: 'all', priority: 'normal' }
 }
-const getInitials = (name) => {
-  if (!name) return '?'
-  return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2)
-}
 
 const editAnnouncement = (announcement) => {
   editingAnnouncement.value = announcement
