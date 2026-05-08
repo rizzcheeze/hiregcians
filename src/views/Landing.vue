@@ -20,52 +20,7 @@
         </div>
       </div>
       <div class="hero-visual">
-        <div class="ai-badge">
-          <div class="ai-dot"></div> Matching preview
-        </div>
-        <div class="match-card">
-          <div class="match-header">
-            <div class="match-title">UI/UX Design Intern</div>
-            <div class="match-pct">94% match</div>
-          </div>
-          <div class="match-sub">BrightPath Digital Solutions · Internship</div>
-          <div class="match-bar-bg">
-            <div class="match-bar" style="width:94%"></div>
-          </div>
-          <div class="match-tags">
-            <span class="tag">Figma</span>
-            <span class="tag">Adobe XD</span>
-            <span class="tag">Prototyping</span>
-          </div>
-        </div>
-        <div class="match-card" style="background:#fff;border:0.5px solid #C0DD97">
-          <div class="match-header">
-            <div class="match-title">Web Dev Assistant</div>
-            <div class="match-pct" style="background:#639922">81% match</div>
-          </div>
-          <div class="match-sub">BrightPath Digital Solutions · Part-time</div>
-          <div class="match-bar-bg">
-            <div class="match-bar" style="width:81%;background:#639922"></div>
-          </div>
-          <div class="match-tags">
-            <span class="tag">Vue.js</span>
-            <span class="tag">HTML/CSS</span>
-          </div>
-        </div>
-        <div class="match-card" style="background:#fff;border:0.5px solid #C0DD97">
-          <div class="match-header">
-            <div class="match-title">Graphic Design Assistant</div>
-            <div class="match-pct" style="background:#97C459;color:#27500A">73% match</div>
-          </div>
-          <div class="match-sub">North Harbor Creatives · Part-time</div>
-          <div class="match-bar-bg">
-            <div class="match-bar" style="width:73%;background:#97C459"></div>
-          </div>
-          <div class="match-tags">
-            <span class="tag">Canva</span>
-            <span class="tag">Layout</span>
-          </div>
-        </div>
+        <img :src="qrCode" class="hero-qr" alt="Hire GCians QR code">
       </div>
     </div>
 
@@ -97,6 +52,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import qrCode from '@/assets/qr.png'
 
 const router = useRouter()
 </script>
@@ -229,90 +185,21 @@ const router = useRouter()
   background: #fff;
   border-radius: 16px;
   border: 0.5px solid #C0DD97;
-  padding: 1.25rem;
+  padding: 2rem;
   position: relative;
-}
-
-.ai-badge {
-  background: var(--gc-dark);
-  color: #C0DD97;
-  font-size: 0.7rem;
-  padding: 4px 10px;
-  border-radius: 20px;
-  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 320px;
 }
 
-.ai-dot {
-  width: 6px;
-  height: 6px;
-  background: #97C459;
-  border-radius: 50%;
-}
-
-.match-card {
-  background: var(--gc-green-light);
+.hero-qr {
+  width: min(300px, 70vw);
+  height: auto;
+  display: block;
   border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.match-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.match-title {
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: var(--gc-dark);
-}
-
-.match-pct {
-  background: var(--gc-green);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 3px 10px;
-  border-radius: 20px;
-}
-
-.match-sub {
-  font-size: 0.78rem;
-  color: var(--gc-muted);
-  margin-bottom: 0.5rem;
-}
-
-.match-bar-bg {
-  background: #C0DD97;
-  border-radius: 4px;
-  height: 5px;
-}
-
-.match-bar {
-  background: var(--gc-green);
-  border-radius: 4px;
-  height: 5px;
-}
-
-.match-tags {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
-}
-
-.tag {
-  font-size: 0.7rem;
-  background: #fff;
-  color: var(--gc-green);
-  padding: 2px 8px;
-  border-radius: 20px;
-  border: 0.5px solid #C0DD97;
+  max-width: 100%;
 }
 
 .how-section {
@@ -402,6 +289,48 @@ const router = useRouter()
   
   .hero h1 {
     font-size: 2.1rem;
+  }
+
+  .hero {
+    padding: 2rem 1rem;
+  }
+
+  .hero-visual {
+    min-height: auto;
+    padding: 1.25rem;
+  }
+
+  .hero-qr {
+    width: min(280px, 78vw);
+  }
+}
+
+@media (max-width: 560px) {
+  .nav {
+    padding: 1rem;
+  }
+
+  .nav-links,
+  .nav-links button,
+  .hero-btns,
+  .hero-btns button {
+    width: 100%;
+  }
+
+  .nav-links {
+    gap: 0.65rem;
+  }
+
+  .nav-links a {
+    width: 100%;
+  }
+
+  .hero h1 {
+    font-size: 1.9rem;
+  }
+
+  .how-section {
+    padding: 2rem 1rem;
   }
 }
 </style>

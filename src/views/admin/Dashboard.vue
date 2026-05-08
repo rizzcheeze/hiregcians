@@ -4,10 +4,10 @@
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="s-logo">Hire <span>GCians!</span><div class="admin-badge">Admin panel</div></div>
       <div class="s-user">
-        <div class="s-avatar">AD</div>
+        <div class="s-avatar">{{ getInitials(authStore.profile?.first_name + ' ' + authStore.profile?.last_name) || 'AD' }}</div>
         <div>
-          <div class="s-name">Admin User</div>
-          <div class="s-role">Gordon College oversight</div>
+          <div class="s-name">{{ authStore.profile?.first_name }} {{ authStore.profile?.last_name }}</div>
+          <div class="s-role">{{ authStore.profile?.role === 'admin' ? 'System Administrator' : authStore.profile?.role }}</div>
         </div>
       </div>
       <ul class="s-nav">
@@ -31,10 +31,10 @@
       <div class="main-header">
         <div>
           <div class="page-title">Platform Overview</div>
-          <div class="page-sub">Gordon College official oversight for Hire GCians!</div>
+          <div class="page-sub">Official oversight for Hire GCians!</div>
         </div>
         <div class="live-badge">
-          <div class="live-dot"></div> Live
+          <div class="live-dot"></div> System Live
         </div>
       </div>
 
@@ -137,16 +137,6 @@
                 </div>
               </div>
               <div v-if="recentActivities.length === 0" class="empty-data">No recent activity</div>
-            </div>
-          </div>
-
-          <div class="data-card talking-points">
-            <div class="card-header"><h3>Presentation Points</h3></div>
-            <div class="points-list">
-              <div class="point-item">📌 Start with landing page</div>
-              <div class="point-item">📌 Show student dashboard and matching</div>
-              <div class="point-item">📌 Demonstrate employer posting flow</div>
-              <div class="point-item">📌 End with admin oversight</div>
             </div>
           </div>
         </div>
@@ -483,9 +473,6 @@ onMounted(() => {
 .alert-dot.warning { background: #F0D070; }
 .alert-title { font-size: 0.8rem; }
 .alert-time { font-size: 0.65rem; color: var(--gc-muted); margin-top: 0.2rem; }
-.talking-points { background: var(--gc-green-light); }
-.point-item { padding: 0.5rem 0; font-size: 0.75rem; color: var(--gc-muted); border-bottom: 1px solid #C0DD97; }
-.point-item:last-child { border-bottom: none; }
 .empty-data { text-align: center; padding: 1rem; color: var(--gc-muted); font-size: 0.8rem; }
 @media (max-width: 900px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-layout { grid-template-columns: 1fr; } .sidebar-toggle { display: flex; position: fixed; bottom: 1rem; right: 1rem; background: var(--gc-green); color: white; width: 50px; height: 50px; border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; z-index: 101; font-size: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); } .sidebar { position: fixed; bottom: 0; left: 0; right: 0; top: auto; height: auto; max-height: 80vh; transform: translateY(100%); transition: transform 0.3s ease; z-index: 100; } .sidebar.open { transform: translateY(0); } }
 .sidebar-toggle { display: none; }

@@ -4,8 +4,11 @@
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="s-logo">Hire <span>GCians!</span><div class="admin-badge">Admin panel</div></div>
       <div class="s-user">
-        <div class="s-avatar">AD</div>
-        <div><div class="s-name">Admin User</div><div class="s-role">Gordon College oversight</div></div>
+        <div class="s-avatar">{{ getInitials(authStore.profile?.first_name + ' ' + authStore.profile?.last_name) || 'AD' }}</div>
+        <div>
+          <div class="s-name">{{ authStore.profile?.first_name }} {{ authStore.profile?.last_name }}</div>
+          <div class="s-role">{{ authStore.profile?.role === 'admin' ? 'System Administrator' : authStore.profile?.role }}</div>
+        </div>
       </div>
 <ul class="s-nav">
   <li :class="{ active: $route.path === '/admin/dashboard' }" @click="$router.push('/admin/dashboard')">⬡ Overview</li>
@@ -26,8 +29,8 @@
 
     <main class="main">
       <div class="main-header">
-        <div><div class="page-title">Reports</div><div class="page-sub">Platform analytics and exportable reports</div></div>
-        <div class="live-badge"><div class="live-dot"></div> Live</div>
+        <div><div class="page-title">Reports</div><div class="page-sub">Analytics and downloadable platform activity data</div></div>
+        <div class="live-badge"><div class="live-dot"></div> System Live</div>
       </div>
 
       <div class="filters-bar">
@@ -49,11 +52,62 @@
         <div class="report-header"><h2>{{ reportTitle }}</h2><p>Generated on {{ new Date().toLocaleString() }}</p></div>
         <div class="stats-row">
           <div class="stat-card"><div class="stat-value">{{ reportData.total }}</div><div class="stat-label">Total</div></div>
-          <div class="stat-card"><div class="stat-value">{{ reportData.active }}</div><div class="stat-label">Active</div></div>
-          <div class="stat-card"><div class="stat-value">{{ reportData.inactive }}</div><div class="stat-label">Inactive</div></div>
-          <div class="stat-card"><div class="stat-value">{{ reportData.percentage }}%</div><div class="stat-label">Engagement</div></div>
+          <div class="stat-card"><div class="stat-value">{{ reportData.active }}</div><div class="stat-label">Active / Valid</div></div>
+          <div class="stat-card"><div class="stat-value">{{ reportData.inactive }}</div><div class="stat-label">Inactive / Other</div></div>
+          <div class="stat-card"><div class="stat-value">{{ reportData.percentage }}%</div><div class="stat-label">Metric Ratio</div></div>
         </div>
-        <div class="data-card"><div class="card-header"><h3>Details</h3></div><div class="report-details"><pre>{{ JSON.stringify(reportData.data, null, 2) }}</pre></div></div>
+        
+        <div class="data-card">
+          <div class="card-header"><h3>Detailed Data</h3></div>
+          <div class="report-table-container">
+            <table class="report-table">
+              <thead>
+                <tr v-if="reportType === 'overview'">
+                  <th>Metric</th><th>Count</th>
+                </tr>
+                <tr v-else-if="reportType === 'users'">
+                  <th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Status</th>
+                </tr>
+                <tr v-else-if="reportType === 'jobs'">
+                  <th>Title</th><th>Employer</th><th>Posted</th><th>Status</th>
+                </tr>
+                <tr v-else-if="reportType === 'applications'">
+                  <th>Student</th><th>Job</th><th>Applied</th><th>Status</th>
+                </tr>
+                <tr v-else-if="reportType === 'matches'">
+                  <th>Student</th><th>Job</th><th>Score</th><th>Rationale</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template v-if="reportType === 'overview'">
+                  <tr v-for="(val, key) in reportData.data" :key="key">
+                    <td>{{ key.replace(/_/g, ' ').toUpperCase() }}</td><td>{{ val }}</td>
+                  </tr>
+                </template>
+                <template v-else-if="reportType === 'users'">
+                  <tr v-for="u in reportData.data" :key="u.id">
+                    <td>{{ u.first_name }} {{ u.last_name }}</td><td>{{ u.email }}</td><td>{{ u.role }}</td><td>{{ formatDate(u.created_at) }}</td><td>{{ u.is_active !== false ? 'Active' : 'Inactive' }}</td>
+                  </tr>
+                </template>
+                <template v-else-if="reportType === 'jobs'">
+                  <tr v-for="j in reportData.data" :key="j.id">
+                    <td>{{ j.title }}</td><td>{{ j.employer_profiles?.company_name || 'N/A' }}</td><td>{{ formatDate(j.posted_at) }}</td><td>{{ j.status }}</td>
+                  </tr>
+                </template>
+                <template v-else-if="reportType === 'applications'">
+                  <tr v-for="a in reportData.data" :key="a.id">
+                    <td>{{ a.profiles?.first_name }} {{ a.profiles?.last_name }}</td><td>{{ a.jobs?.title }}</td><td>{{ formatDate(a.applied_at) }}</td><td>{{ a.status }}</td>
+                  </tr>
+                </template>
+                <template v-else-if="reportType === 'matches'">
+                  <tr v-for="m in reportData.data" :key="m.id">
+                    <td>{{ m.profiles?.first_name }} {{ m.profiles?.last_name }}</td><td>{{ m.jobs?.title }}</td><td>{{ Math.round(m.score * 100) }}%</td><td class="rationale-cell">{{ m.rationale }}</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
       <div v-else class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Select filters and click Generate Report</div></div>
     </main>
@@ -79,6 +133,7 @@ const endDate = ref(new Date().toISOString().split('T')[0])
 
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
+const formatDate = (d) => d ? new Date(d).toLocaleDateString() : 'N/A'
 
 const generateReport = async () => {
   generating.value = true
@@ -127,9 +182,11 @@ const exportReport = () => {
 
 const convertToCSV = (data) => {
   if (!data || !data.length) return ''
-  const headers = Object.keys(data[0])
+  const isArray = Array.isArray(data)
+  const rows = isArray ? data : [data]
+  const headers = Object.keys(rows[0])
   const csvRows = [headers.join(',')]
-  for (const row of data) { const values = headers.map(header => JSON.stringify(row[header] || '')); csvRows.push(values.join(',')) }
+  for (const row of rows) { const values = headers.map(header => JSON.stringify(row[header] || '')); csvRows.push(values.join(',')) }
   return csvRows.join('\n')
 }
 </script>
@@ -151,8 +208,12 @@ const convertToCSV = (data) => {
 .data-card { background: #fff; border-radius: 12px; border: 1px solid #C0DD97; overflow: hidden; }
 .card-header { padding: 0.75rem 1rem; border-bottom: 1px solid #EAF3DE; }
 .card-header h3 { font-size: 0.85rem; margin: 0; }
-.report-details { padding: 1rem; max-height: 400px; overflow-y: auto; }
-.report-details pre { font-size: 0.7rem; background: #FAFAF7; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+.report-table-container { padding: 0; overflow-x: auto; max-height: 500px; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.report-table th { background: #FAFAF7; text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid #C0DD97; color: var(--gc-muted); font-weight: 600; }
+.report-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #EAF3DE; }
+.report-table tr:hover { background: #FAFAF7; }
+.rationale-cell { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.7rem; color: var(--gc-muted); }
 .loading-state, .empty-state { text-align: center; padding: 3rem; color: var(--gc-muted); }
 .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
 .empty-title { font-size: 1rem; }

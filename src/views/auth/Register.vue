@@ -95,7 +95,48 @@
         </div>
 
         <label class="form-label">Password</label>
-        <input class="form-input" v-model="signupForm.password" type="password" placeholder="At least 8 characters" />
+        <div class="password-wrapper">
+          <input
+            class="form-input"
+            v-model="signupForm.password"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="At least 8 characters"
+            style="margin-bottom: 0.5rem; padding-right: 2.5rem;"
+          />
+          <span class="pw-toggle" @click="showPassword = !showPassword">
+            {{ showPassword ? '🙈' : '👁️' }}
+          </span>
+        </div>
+
+        <!-- Password strength bar -->
+        <div v-if="signupForm.password.length > 0" class="strength-wrapper">
+          <div class="strength-bar">
+            <div
+              class="strength-fill"
+              :style="{ width: strengthPercent + '%', background: strengthColor }"
+            ></div>
+          </div>
+          <div class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</div>
+        </div>
+
+        <!-- Password requirements checklist -->
+        <div v-if="signupForm.password.length > 0" class="pw-checklist">
+          <div class="pw-check" :class="{ met: checks.length }">
+            {{ checks.length ? '✓' : '✗' }} At least 8 characters
+          </div>
+          <div class="pw-check" :class="{ met: checks.uppercase }">
+            {{ checks.uppercase ? '✓' : '✗' }} One uppercase letter
+          </div>
+          <div class="pw-check" :class="{ met: checks.lowercase }">
+            {{ checks.lowercase ? '✓' : '✗' }} One lowercase letter
+          </div>
+          <div class="pw-check" :class="{ met: checks.number }">
+            {{ checks.number ? '✓' : '✗' }} One number
+          </div>
+          <div class="pw-check" :class="{ met: checks.special }">
+            {{ checks.special ? '✓' : '✗' }} One special character (!@#$%^&*)
+          </div>
+        </div>
 
         <p v-if="signupError" class="error-message">{{ signupError }}</p>
 
@@ -104,17 +145,17 @@
         </button>
 
         <div class="terms">
-  By continuing, you agree to our 
-  <a href="/terms" target="_blank">Terms of Use</a> and 
-  <a href="/privacy" target="_blank">Privacy Policy</a>.
-</div>
+          By continuing, you agree to our
+          <a href="/terms" target="_blank">Terms of Use</a> and
+          <a href="/privacy" target="_blank">Privacy Policy</a>.
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/api/supabase'
@@ -124,6 +165,7 @@ const authStore = useAuthStore()
 
 const signupRole = ref('student')
 const showEmployerExtras = ref(false)
+const showPassword = ref(false)
 const signupForm = ref({
   first_name: '',
   last_name: '',
@@ -136,12 +178,58 @@ const signupForm = ref({
 const signupLoading = ref(false)
 const signupError = ref('')
 
+// Password requirement checks
+const checks = computed(() => ({
+  length:    signupForm.value.password.length >= 8,
+  uppercase: /[A-Z]/.test(signupForm.value.password),
+  lowercase: /[a-z]/.test(signupForm.value.password),
+  number:    /[0-9]/.test(signupForm.value.password),
+  special:   /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(signupForm.value.password),
+}))
+
+const strengthScore = computed(() => Object.values(checks.value).filter(Boolean).length)
+
+const strengthPercent = computed(() => (strengthScore.value / 5) * 100)
+
+const strengthColor = computed(() => {
+  if (strengthScore.value <= 1) return '#E53535'
+  if (strengthScore.value === 2) return '#E57F35'
+  if (strengthScore.value === 3) return '#E5C535'
+  if (strengthScore.value === 4) return '#7DB84A'
+  return '#3B6D11'
+})
+
+const strengthLabel = computed(() => {
+  if (strengthScore.value <= 1) return 'Very weak'
+  if (strengthScore.value === 2) return 'Weak'
+  if (strengthScore.value === 3) return 'Fair'
+  if (strengthScore.value === 4) return 'Good'
+  return 'Strong'
+})
+
+const isPasswordValid = computed(() => Object.values(checks.value).every(Boolean))
+
+const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+
 const handleSignup = async () => {
-  signupLoading.value = true
   signupError.value = ''
-  
+
+  // Validate required fields
+  if (!signupForm.value.first_name || !signupForm.value.last_name) {
+    signupError.value = 'Please enter your full name.'
+    return
+  }
+  if (!validateEmail(signupForm.value.email)) {
+    signupError.value = 'Please enter a valid email address.'
+    return
+  }
+  if (!isPasswordValid.value) {
+    signupError.value = 'Password does not meet all requirements.'
+    return
+  }
+
+  signupLoading.value = true
   try {
-    // Register user
     await authStore.register({
       email: signupForm.value.email,
       password: signupForm.value.password,
@@ -149,26 +237,20 @@ const handleSignup = async () => {
       last_name: signupForm.value.last_name,
       role: signupRole.value
     })
-    
-    // After registration, create student or employer profile
+
     if (signupRole.value === 'student') {
-      await supabase
-        .from('student_profiles')
-        .insert({
-          user_id: authStore.user.id,
-          program: signupForm.value.program,
-          section: signupForm.value.year_level
-        })
+      await supabase.from('student_profiles').insert({
+        user_id: authStore.user.id,
+        program: signupForm.value.program,
+        section: signupForm.value.year_level
+      })
     } else if (signupRole.value === 'employer') {
-      await supabase
-        .from('employer_profiles')
-        .insert({
-          user_id: authStore.user.id,
-          company_name: signupForm.value.company_name
-        })
+      await supabase.from('employer_profiles').insert({
+        user_id: authStore.user.id,
+        company_name: signupForm.value.company_name
+      })
     }
-    
-    // Redirect to appropriate dashboard
+
     if (signupRole.value === 'student') {
       router.push('/student/dashboard')
     } else {
@@ -183,11 +265,7 @@ const handleSignup = async () => {
 </script>
 
 <style scoped>
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 .auth-container {
   font-family: 'DM Sans', sans-serif;
@@ -217,298 +295,76 @@ const handleSignup = async () => {
   pointer-events: none;
 }
 
-.lp-logo {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.4rem;
-  color: #C0DD97;
-  position: relative;
-  z-index: 1;
-}
-
-.lp-logo span {
-  color: #97C459;
-}
-
-.lp-hero {
-  position: relative;
-  z-index: 1;
-  margin: 2rem 0;
-}
-
-.lp-label {
-  font-size: 0.72rem;
-  color: #97C459;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 1rem;
-}
-
-.lp-heading {
-  font-family: 'DM Serif Display', serif;
-  font-size: 2.4rem;
-  line-height: 1.2;
-  color: #fff;
-  margin-bottom: 1rem;
-}
-
-.lp-heading em {
-  color: #C0DD97;
-  font-style: italic;
-}
-
-.lp-sub {
-  font-size: 0.88rem;
-  color: #97C459;
-  line-height: 1.7;
-  max-width: 340px;
-}
-
-.lp-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 2rem;
-}
-
-.lp-card {
-  background: rgba(255,255,255,0.06);
-  border: 0.5px solid rgba(192,221,151,0.2);
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.lp-card-dot {
-  width: 8px;
-  height: 8px;
-  background: #97C459;
-  border-radius: 50%;
-}
-
-.lp-card-title {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #fff;
-}
-
-.lp-card-sub {
-  font-size: 0.72rem;
-  color: #97C459;
-}
-
-.lp-pct {
-  font-size: 0.72rem;
-  font-weight: 500;
-  background: var(--gc-green);
-  color: #C0DD97;
-  padding: 2px 8px;
-  border-radius: 20px;
-  margin-left: auto;
-}
+.lp-logo { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: #C0DD97; position: relative; z-index: 1; }
+.lp-logo span { color: #97C459; }
+.lp-hero { position: relative; z-index: 1; margin: 2rem 0; }
+.lp-label { font-size: 0.72rem; color: #97C459; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem; }
+.lp-heading { font-family: 'DM Serif Display', serif; font-size: 2.4rem; line-height: 1.2; color: #fff; margin-bottom: 1rem; }
+.lp-heading em { color: #C0DD97; font-style: italic; }
+.lp-sub { font-size: 0.88rem; color: #97C459; line-height: 1.7; max-width: 340px; }
+.lp-cards { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 2rem; }
+.lp-card { background: rgba(255,255,255,0.06); border: 0.5px solid rgba(192,221,151,0.2); border-radius: 10px; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; }
+.lp-card-dot { width: 8px; height: 8px; background: #97C459; border-radius: 50%; }
+.lp-card-title { font-size: 0.8rem; font-weight: 500; color: #fff; }
+.lp-card-sub { font-size: 0.72rem; color: #97C459; }
+.lp-pct { font-size: 0.72rem; font-weight: 500; background: var(--gc-green); color: #C0DD97; padding: 2px 8px; border-radius: 20px; margin-left: auto; }
 
 /* Right Panel */
-.right-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
+.right-panel { display: flex; align-items: center; justify-content: center; padding: 2rem; }
+.auth-box { width: 100%; max-width: 400px; }
 
-.auth-box {
-  width: 100%;
-  max-width: 400px;
-}
+.auth-tabs { display: flex; border-bottom: 0.5px solid #C0DD97; margin-bottom: 1.75rem; }
+.auth-tab { font-size: 0.88rem; color: var(--gc-muted); padding: 0.6rem 1.25rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.auth-tab.active { color: var(--gc-green); font-weight: 500; border-bottom-color: var(--gc-green); }
 
-.auth-tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 0.5px solid #C0DD97;
-  margin-bottom: 1.75rem;
-}
+.auth-heading { font-family: 'DM Serif Display', serif; font-size: 1.8rem; color: var(--gc-dark); margin-bottom: 1rem; }
 
-.auth-tab {
-  font-size: 0.88rem;
-  color: var(--gc-muted);
-  padding: 0.6rem 1.25rem;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-}
+.role-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 1.5rem; }
+.role-card { border: 1.5px solid #C0DD97; border-radius: 10px; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.15s; background: #fff; }
+.role-card.selected { border-color: var(--gc-green); background: var(--gc-green-light); }
+.role-icon { font-size: 1.4rem; margin-bottom: 0.4rem; }
+.role-title { font-size: 0.82rem; font-weight: 500; color: var(--gc-dark); }
+.role-sub { font-size: 0.7rem; color: var(--gc-muted); margin-top: 0.15rem; }
 
-.auth-tab.active {
-  color: var(--gc-green);
-  font-weight: 500;
-  border-bottom-color: var(--gc-green);
-}
+.form-label { font-size: 0.78rem; font-weight: 500; color: var(--gc-dark); margin-bottom: 0.4rem; display: block; }
+.form-input { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; margin-bottom: 1rem; transition: border-color 0.15s; }
+.form-input:focus { border-color: var(--gc-green); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.form-select { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; margin-bottom: 1rem; }
 
-.auth-heading {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.8rem;
-  color: var(--gc-dark);
-  margin-bottom: 1rem;
-}
+.signup-extras { display: none; }
+.signup-extras.visible { display: block; }
 
-.role-selector {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-  margin-bottom: 1.5rem;
-}
+/* Password toggle wrapper */
+.password-wrapper { position: relative; }
+.pw-toggle { position: absolute; right: 0.75rem; top: 0.6rem; cursor: pointer; font-size: 0.9rem; user-select: none; }
 
-.role-card {
-  border: 1.5px solid #C0DD97;
-  border-radius: 10px;
-  padding: 0.85rem;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.15s;
-  background: #fff;
-}
+/* Strength bar */
+.strength-wrapper { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.strength-bar { flex: 1; height: 6px; background: #EAF3DE; border-radius: 4px; overflow: hidden; }
+.strength-fill { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
+.strength-label { font-size: 0.72rem; font-weight: 500; min-width: 60px; }
 
-.role-card.selected {
-  border-color: var(--gc-green);
-  background: var(--gc-green-light);
-}
+/* Checklist */
+.pw-checklist { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; }
+.pw-check { font-size: 0.72rem; color: #B4B2A9; transition: color 0.2s; }
+.pw-check.met { color: var(--gc-green); }
 
-.role-icon {
-  font-size: 1.4rem;
-  margin-bottom: 0.4rem;
-}
+.btn-full { width: 100%; background: var(--gc-green); color: #fff; border: none; border-radius: 20px; padding: 0.7rem; font-size: 0.9rem; font-family: 'DM Serif Display', serif; cursor: pointer; transition: opacity 0.15s; margin-top: 0.5rem; }
+.btn-full:hover { opacity: 0.9; }
+.btn-full:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.role-title {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--gc-dark);
-}
+.error-message { color: #B03030; font-size: 0.75rem; margin-bottom: 0.5rem; text-align: center; }
 
-.role-sub {
-  font-size: 0.7rem;
-  color: var(--gc-muted);
-  margin-top: 0.15rem;
-}
-
-.form-label {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--gc-dark);
-  margin-bottom: 0.4rem;
-  display: block;
-}
-
-.form-input {
-  width: 100%;
-  border: 0.5px solid #C0DD97;
-  border-radius: 8px;
-  padding: 0.6rem 0.85rem;
-  font-size: 0.85rem;
-  font-family: 'DM Sans', sans-serif;
-  color: var(--gc-dark);
-  background: #fff;
-  outline: none;
-  margin-bottom: 1rem;
-  transition: border-color 0.15s;
-}
-
-.form-input:focus {
-  border-color: var(--gc-green);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-}
-
-.form-select {
-  width: 100%;
-  border: 0.5px solid #C0DD97;
-  border-radius: 8px;
-  padding: 0.6rem 0.85rem;
-  font-size: 0.85rem;
-  font-family: 'DM Sans', sans-serif;
-  color: var(--gc-dark);
-  background: #fff;
-  outline: none;
-  margin-bottom: 1rem;
-}
-
-.signup-extras {
-  display: none;
-}
-
-.signup-extras.visible {
-  display: block;
-}
-
-.btn-full {
-  width: 100%;
-  background: var(--gc-green);
-  color: #fff;
-  border: none;
-  border-radius: 20px;
-  padding: 0.7rem;
-  font-size: 0.9rem;
-  font-family: 'DM Serif Display', serif;
-  cursor: pointer;
-  transition: opacity 0.15s;
-  margin-top: 0.5rem;
-}
-
-.btn-full:hover {
-  opacity: 0.9;
-}
-
-.btn-full:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.error-message {
-  color: #B03030;
-  font-size: 0.75rem;
-  margin-bottom: 0.5rem;
-  text-align: center;
-}
-
-.terms {
-  font-size: 0.72rem;
-  color: #B4B2A9;
-  text-align: center;
-  margin-top: 1.25rem;
-  line-height: 1.6;
-}
-
-.terms a {
-  color: var(--gc-green-mid);
-  text-decoration: none;
-}
-
-.terms a:hover {
-  text-decoration: underline;
-}
+.terms { font-size: 0.72rem; color: #B4B2A9; text-align: center; margin-top: 1.25rem; line-height: 1.6; }
+.terms a { color: var(--gc-green-mid); text-decoration: none; }
+.terms a:hover { text-decoration: underline; }
 
 @media (max-width: 900px) {
-  .auth-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .left-panel {
-    padding: 2rem;
-    min-height: auto;
-  }
-  
-  .right-panel {
-    padding: 1.25rem;
-  }
-  
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-  
-  .role-selector {
-    grid-template-columns: 1fr;
-  }
+  .auth-container { grid-template-columns: 1fr; }
+  .left-panel { padding: 2rem; min-height: auto; }
+  .right-panel { padding: 1.25rem; }
+  .form-row { grid-template-columns: 1fr; }
+  .role-selector { grid-template-columns: 1fr; }
 }
 </style>

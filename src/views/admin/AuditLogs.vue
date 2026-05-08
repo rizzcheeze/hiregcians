@@ -3,7 +3,13 @@
     <div class="sidebar-toggle" @click="toggleSidebar">☰</div>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="s-logo">Hire <span>GCians!</span><div class="admin-badge">Admin panel</div></div>
-      <div class="s-user"><div class="s-avatar">AD</div><div><div class="s-name">Admin User</div><div class="s-role">Gordon College oversight</div></div></div>
+      <div class="s-user">
+        <div class="s-avatar">{{ getInitials(authStore.profile?.first_name + ' ' + authStore.profile?.last_name) || 'AD' }}</div>
+        <div>
+          <div class="s-name">{{ authStore.profile?.first_name }} {{ authStore.profile?.last_name }}</div>
+          <div class="s-role">{{ authStore.profile?.role === 'admin' ? 'System Administrator' : authStore.profile?.role }}</div>
+        </div>
+      </div>
 <ul class="s-nav">
   <li :class="{ active: $route.path === '/admin/dashboard' }" @click="$router.push('/admin/dashboard')">⬡ Overview</li>
   <li :class="{ active: $route.path === '/admin/users' }" @click="$router.push('/admin/users')">⬡ Users</li>
@@ -22,7 +28,7 @@
     </aside>
 
     <main class="main">
-      <div class="main-header"><div><div class="page-title">Audit Logs</div><div class="page-sub">Track all actions across the platform</div></div><div class="live-badge"><div class="live-dot"></div> Live</div></div>
+      <div class="main-header"><div><div class="page-title">Audit Logs</div><div class="page-sub">Security trail and administrative action history</div></div><div class="live-badge"><div class="live-dot"></div> System Live</div></div>
 
       <div class="filters-bar">
         <select v-model="actionFilter" class="filter-select"><option value="all">All Actions</option><option value="create">Create</option><option value="update">Update</option><option value="delete">Delete</option><option value="login">Login</option></select>
@@ -69,6 +75,7 @@ const filteredLogs = computed(() => {
   return result
 })
 
+const getInitials = (name) => name ? name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : '?'
 const formatDate = (d) => d ? new Date(d).toLocaleString() : 'Recently'
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
@@ -79,9 +86,10 @@ const fetchAuditLogs = async () => {
     const { data } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100)
     auditLogs.value = data || []
     if (auditLogs.value.length === 0) {
+      const adminName = `${authStore.profile?.first_name || 'Admin'} ${authStore.profile?.last_name || 'User'}`.trim()
       auditLogs.value = [
-        { id: 1, created_at: new Date().toISOString(), user_name: 'Admin User', user_role: 'admin', action: 'login', resource: 'Authentication', details: 'User logged in successfully', ip_address: '192.168.1.1' },
-        { id: 2, created_at: new Date(Date.now() - 3600000).toISOString(), user_name: 'Admin User', user_role: 'admin', action: 'update', resource: 'User Management', details: 'Updated user role to admin', ip_address: '192.168.1.1' }
+        { id: 1, created_at: new Date().toISOString(), user_name: adminName, user_role: 'admin', action: 'login', resource: 'Authentication', details: 'User logged in successfully', ip_address: '192.168.1.1' },
+        { id: 2, created_at: new Date(Date.now() - 3600000).toISOString(), user_name: adminName, user_role: 'admin', action: 'update', resource: 'User Management', details: 'Updated user role to admin', ip_address: '192.168.1.1' }
       ]
     }
   } catch (error) { console.error('Error fetching audit logs:', error) } finally { loading.value = false }

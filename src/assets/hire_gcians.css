@@ -22,6 +22,25 @@ body {
     color: var(--gc-dark);
 }
 
+html {
+    width: 100%;
+    overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+    max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
 /* Layout */
 .dash {
     display: grid;
@@ -220,6 +239,21 @@ body {
 .btn-primary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+button,
+.btn-primary,
+.btn-outline,
+.btn-sm,
+.apply-btn,
+.apply-btn-big,
+.save-btn,
+.status-btn,
+.stage-tab,
+.stab,
+.filter-option,
+.s-nav li {
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* Metrics Cards */
@@ -873,7 +907,10 @@ body {
     .main-header,
     .jobs-header,
     .filters-bar,
-    .search-row {
+    .search-row,
+    .actions-row,
+    .toolbar,
+    .controls-row {
         flex-direction: column !important;
         align-items: stretch !important;
         width: 100% !important;
@@ -887,10 +924,16 @@ body {
     .settings-layout,
     .metrics-grid,
     .stats-row,
-    .form-row {
+    .summary-row,
+    .form-row,
+    .applicants-layout,
+    .profile-layout,
+    .settings-grid,
+    .reports-grid {
         grid-template-columns: 1fr !important;
         width: 100% !important;
         min-width: 0 !important;
+        height: auto !important;
     }
 
     .metrics {
@@ -903,14 +946,26 @@ body {
     .preview-card,
     .detail-panel,
     .filters,
-    .jobs-col {
+    .jobs-col,
+    .applicants-container,
+    .applicants-list,
+    .applicant-details,
+    .applicant-actions,
+    .job-selector,
+    .modal,
+    .modal-content {
         width: 100% !important;
         min-width: 0 !important;
+        max-width: 100% !important;
     }
 
     .job-card,
     .app-card,
-    .job-row {
+    .job-row,
+    .applicant-card,
+    .data-card,
+    .sum-card,
+    .metric-card {
         grid-template-columns: 1fr !important;
         width: 100% !important;
         min-width: 0 !important;
@@ -924,6 +979,8 @@ body {
 
     .search-input,
     .filter-select,
+    .sort-select,
+    .job-select,
     .form-input,
     .form-select,
     .form-textarea,
@@ -931,6 +988,58 @@ body {
     select,
     textarea {
         max-width: 100% !important;
+    }
+
+    .status-tabs,
+    .stage-tabs,
+    .filter-group,
+    .presentation-chip-row {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .status-tabs::-webkit-scrollbar,
+    .stage-tabs::-webkit-scrollbar,
+    .filter-group::-webkit-scrollbar,
+    .presentation-chip-row::-webkit-scrollbar {
+        display: none;
+    }
+
+    .stab,
+    .stage-tab,
+    .filter-option {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    .applicants-container {
+        display: block !important;
+        overflow: visible !important;
+    }
+
+    .applicants-layout,
+    .applicants-list,
+    .applicant-details,
+    .applicant-actions,
+    .list-scroll {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+
+    .applicant-actions {
+        border-left: 0 !important;
+        border-top: 1px solid #C0DD97 !important;
+    }
+
+    .job-selector {
+        padding: 4.25rem 1rem 1rem !important;
+    }
+
+    .main + .applicants-container,
+    .dash > .applicants-container {
+        padding-top: 3.25rem !important;
     }
 
     .table-header {
@@ -946,8 +1055,14 @@ body {
     .apps-table,
     .jobs-table,
     .logs-table,
-    .employers-table {
+    .employers-table,
+    .users-table,
+    .reports-table {
         min-width: 0 !important;
+        overflow-x: visible !important;
+    }
+
+    .table-container {
         overflow-x: visible !important;
     }
 }
@@ -977,6 +1092,34 @@ body {
 
     .s-nav li {
         padding: 0.7rem 1rem !important;
+    }
+
+    .btn-primary,
+    .btn-outline,
+    .btn-sm,
+    .apply-btn,
+    .apply-btn-big,
+    .save-btn,
+    .status-btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .job-right,
+    .app-right {
+        width: 100%;
+    }
+
+    .pct-pill,
+    .pct,
+    .status-pill {
+        white-space: normal !important;
+        text-align: center;
+    }
+
+    .empty-state {
+        padding: 2rem 1rem !important;
     }
 }
 

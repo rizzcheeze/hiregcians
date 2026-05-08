@@ -4,10 +4,10 @@
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="s-logo">Hire <span>GCians!</span><div class="admin-badge">Admin panel</div></div>
       <div class="s-user">
-        <div class="s-avatar">AD</div>
+        <div class="s-avatar">{{ getInitials(authStore.profile?.first_name + ' ' + authStore.profile?.last_name) || 'AD' }}</div>
         <div>
-          <div class="s-name">Admin User</div>
-          <div class="s-role">Gordon College oversight</div>
+          <div class="s-name">{{ authStore.profile?.first_name }} {{ authStore.profile?.last_name }}</div>
+          <div class="s-role">{{ authStore.profile?.role === 'admin' ? 'System Administrator' : authStore.profile?.role }}</div>
         </div>
       </div>
 <ul class="s-nav">
@@ -31,9 +31,9 @@
       <div class="main-header">
         <div>
           <div class="page-title">AI Match Logs</div>
-          <div class="page-sub">Resume-driven match previews and AI activity</div>
+          <div class="page-sub">Transparency log for resume-to-job matching scores and rationales</div>
         </div>
-        <div class="live-badge"><div class="live-dot"></div> Live</div>
+        <div class="live-badge"><div class="live-dot"></div> System Live</div>
       </div>
 
       <div class="stats-row">
