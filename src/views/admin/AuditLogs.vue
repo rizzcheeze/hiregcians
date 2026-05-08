@@ -4,47 +4,78 @@
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="s-logo">Hire <span>GCians!</span><div class="admin-badge">Admin panel</div></div>
       <div class="s-user">
-        <div class="s-avatar">{{ getInitials(authStore.profile?.first_name + ' ' + authStore.profile?.last_name) || 'AD' }}</div>
+        <div class="s-avatar">{{ getInitials(authStore.profile?.first_name + ' ' + authStore.profile?.last_name) }}</div>
         <div>
           <div class="s-name">{{ authStore.profile?.first_name }} {{ authStore.profile?.last_name }}</div>
-          <div class="s-role">{{ authStore.profile?.role === 'admin' ? 'System Administrator' : authStore.profile?.role }}</div>
+          <div class="s-role">System Administrator</div>
         </div>
       </div>
-<ul class="s-nav">
-  <li :class="{ active: $route.path === '/admin/dashboard' }" @click="$router.push('/admin/dashboard')">⬡ Overview</li>
-  <li :class="{ active: $route.path === '/admin/users' }" @click="$router.push('/admin/users')">⬡ Users</li>
-  <li :class="{ active: $route.path === '/admin/listings' }" @click="$router.push('/admin/listings')">⬡ All listings</li>
-  <li :class="{ active: $route.path === '/admin/applications' }" @click="$router.push('/admin/applications')">⬡ Applications</li>
-  <li :class="{ active: $route.path === '/admin/ai-logs' }" @click="$router.push('/admin/ai-logs')">⬡ AI match logs</li>
-  <div class="s-nav-label">Management</div>
-  <li :class="{ active: $route.path === '/admin/employers' }" @click="$router.push('/admin/employers')">⬡ Employers</li>
-  <li :class="{ active: $route.path === '/admin/announcements' }" @click="$router.push('/admin/announcements')">⬡ Announcements</li>
-  <li :class="{ active: $route.path === '/admin/reports' }" @click="$router.push('/admin/reports')">⬡ Reports</li>
-  <div class="s-nav-label">System</div>
-  <li :class="{ active: $route.path === '/admin/settings' }" @click="$router.push('/admin/settings')">⬡ Settings</li>
-  <li :class="{ active: $route.path === '/admin/audit-logs' }" @click="$router.push('/admin/audit-logs')">⬡ Audit logs</li>
-  <li @click="handleLogout">⬡ Logout</li>
-</ul>
+      <ul class="s-nav">
+        <li :class="{ active: $route.path === '/admin/dashboard' }" @click="$router.push('/admin/dashboard')">⬡ Overview</li>
+        <li :class="{ active: $route.path === '/admin/users' }" @click="$router.push('/admin/users')">⬡ Users</li>
+        <li :class="{ active: $route.path === '/admin/listings' }" @click="$router.push('/admin/listings')">⬡ All listings</li>
+        <li :class="{ active: $route.path === '/admin/applications' }" @click="$router.push('/admin/applications')">⬡ Applications</li>
+        <li :class="{ active: $route.path === '/admin/ai-logs' }" @click="$router.push('/admin/ai-logs')">⬡ AI match logs</li>
+        <div class="s-nav-label">Management</div>
+        <li :class="{ active: $route.path === '/admin/employers' }" @click="$router.push('/admin/employers')">⬡ Employers</li>
+        <li :class="{ active: $route.path === '/admin/announcements' }" @click="$router.push('/admin/announcements')">⬡ Announcements</li>
+        <li :class="{ active: $route.path === '/admin/reports' }" @click="$router.push('/admin/reports')">⬡ Reports</li>
+        <div class="s-nav-label">System</div>
+        <li :class="{ active: $route.path === '/admin/settings' }" @click="$router.push('/admin/settings')">⬡ Settings</li>
+        <li :class="{ active: $route.path === '/admin/audit-logs' }" @click="$router.push('/admin/audit-logs')">⬡ Audit logs</li>
+        <li @click="handleLogout">⬡ Logout</li>
+      </ul>
     </aside>
 
     <main class="main">
-      <div class="main-header"><div><div class="page-title">Audit Logs</div><div class="page-sub">Security trail and administrative action history</div></div><div class="live-badge"><div class="live-dot"></div> System Live</div></div>
+      <div class="main-header">
+        <div>
+          <div class="page-title">Audit Logs</div>
+          <div class="page-sub">Security trail and administrative action history</div>
+        </div>
+        <div class="live-badge"><div class="live-dot"></div> System Live</div>
+      </div>
 
       <div class="filters-bar">
-        <select v-model="actionFilter" class="filter-select"><option value="all">All Actions</option><option value="create">Create</option><option value="update">Update</option><option value="delete">Delete</option><option value="login">Login</option></select>
-        <select v-model="userFilter" class="filter-select"><option value="all">All Users</option><option value="admin">Admins</option><option value="employer">Employers</option><option value="student">Students</option></select>
+        <select v-model="actionFilter" class="filter-select">
+          <option value="all">All Actions</option>
+          <option value="create">Create</option>
+          <option value="update">Update</option>
+          <option value="delete">Delete</option>
+          <option value="login">Login</option>
+        </select>
+        <select v-model="userFilter" class="filter-select">
+          <option value="all">All Users</option>
+          <option value="admin">Admins</option>
+          <option value="employer">Employers</option>
+          <option value="student">Students</option>
+        </select>
         <input type="text" v-model="searchQuery" placeholder="Search..." class="search-input" />
       </div>
 
       <div class="table-container">
         <div v-if="loading" class="loading-state">Loading audit logs...</div>
+        <div v-else-if="filteredLogs.length === 0" class="empty-state">
+          <div class="empty-icon">🗒️</div>
+          <div>No audit logs found</div>
+        </div>
         <div v-else class="logs-table">
-          <div class="table-header"><div>Timestamp</div><div>User</div><div>Action</div><div>Resource</div><div>Details</div><div>IP Address</div></div>
-          <div v-for="log in filteredLogs" :key="log.id" class="table-row">
-            <div>{{ formatDate(log.created_at) }}</div><div><span class="user-badge" :class="log.user_role">{{ log.user_name }}</span></div>
-            <div><span class="action-badge" :class="log.action">{{ log.action }}</span></div><div>{{ log.resource }}</div><div class="details">{{ log.details }}</div><div>{{ log.ip_address || 'N/A' }}</div>
+          <div class="table-header">
+            <div>Timestamp</div>
+            <div>User</div>
+            <div>Action</div>
+            <div>Resource</div>
+            <div>Details</div>
+            <div>IP Address</div>
           </div>
-          <div v-if="filteredLogs.length === 0" class="empty-state">No audit logs found</div>
+          <div v-for="log in filteredLogs" :key="log.id" class="table-row">
+            <div>{{ formatDate(log.created_at) }}</div>
+            <div><span class="user-badge" :class="log.user_role">{{ log.user_name }}</span></div>
+            <div><span class="action-badge" :class="log.action">{{ log.action }}</span></div>
+            <div>{{ log.resource }}</div>
+            <div class="details">{{ log.details }}</div>
+            <div>{{ log.ip_address || 'N/A' }}</div>
+          </div>
         </div>
       </div>
     </main>
@@ -71,36 +102,45 @@ const filteredLogs = computed(() => {
   let result = auditLogs.value
   if (actionFilter.value !== 'all') result = result.filter(l => l.action === actionFilter.value)
   if (userFilter.value !== 'all') result = result.filter(l => l.user_role === userFilter.value)
-  if (searchQuery.value) { const q = searchQuery.value.toLowerCase(); result = result.filter(l => l.user_name.toLowerCase().includes(q) || l.details.toLowerCase().includes(q)) }
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(l =>
+      (l.user_name || '').toLowerCase().includes(q) ||
+      (l.details || '').toLowerCase().includes(q)
+    )
+  }
   return result
 })
 
 const getInitials = (name) => name ? name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : '?'
-const formatDate = (d) => d ? new Date(d).toLocaleString() : 'Recently'
+const formatDate = (d) => d ? new Date(d).toLocaleString() : '—'
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
 
 const fetchAuditLogs = async () => {
   loading.value = true
   try {
-    const { data } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100)
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (error) throw error
     auditLogs.value = data || []
-    if (auditLogs.value.length === 0) {
-      const adminName = `${authStore.profile?.first_name || 'Admin'} ${authStore.profile?.last_name || 'User'}`.trim()
-      auditLogs.value = [
-        { id: 1, created_at: new Date().toISOString(), user_name: adminName, user_role: 'admin', action: 'login', resource: 'Authentication', details: 'User logged in successfully', ip_address: '192.168.1.1' },
-        { id: 2, created_at: new Date(Date.now() - 3600000).toISOString(), user_name: adminName, user_role: 'admin', action: 'update', resource: 'User Management', details: 'Updated user role to admin', ip_address: '192.168.1.1' }
-      ]
-    }
-  } catch (error) { console.error('Error fetching audit logs:', error) } finally { loading.value = false }
+  } catch (error) {
+    console.error('Error fetching audit logs:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => { fetchAuditLogs() })
 </script>
 
 <style scoped>
-.admin-badge, .s-role { font-size: 0.65rem; background: rgba(192,221,151,0.15); color: #97C459; padding: 2px 8px; border-radius: 20px; display: inline-block; }
-.s-role { display: block; margin-top: 0.2rem; }
+.admin-badge { font-size: 0.65rem; background: rgba(192,221,151,0.15); color: #97C459; padding: 2px 8px; border-radius: 20px; margin-top: 0.35rem; display: inline-block; }
+.s-role { font-size: 0.7rem; color: #97C459; opacity: 0.7; margin-top: 0.2rem; }
 .live-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; background: rgba(151,196,89,0.15); padding: 0.3rem 0.8rem; border-radius: 20px; color: #97C459; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #97C459; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -121,8 +161,14 @@ onMounted(() => { fetchAuditLogs() })
 .action-badge.delete { background: #FEF0F0; color: #B03030; }
 .action-badge.login { background: #EAF3DE; color: var(--gc-green); }
 .details { font-size: 0.7rem; color: var(--gc-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.loading-state, .empty-state { text-align: center; padding: 2rem; color: var(--gc-muted); }
-@media (max-width: 900px) { .table-header, .table-row { grid-template-columns: 1fr; gap: 0.5rem; } .table-header { display: none; } .table-row { padding: 1rem; } .sidebar-toggle { display: flex; position: fixed; bottom: 1rem; right: 1rem; background: var(--gc-green); color: white; width: 50px; height: 50px; border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; z-index: 101; font-size: 24px; } .sidebar { position: fixed; bottom: 0; left: 0; right: 0; top: auto; height: auto; max-height: 80vh; transform: translateY(100%); transition: transform 0.3s ease; z-index: 100; } .sidebar.open { transform: translateY(0); } }
+.loading-state, .empty-state { text-align: center; padding: 3rem; color: var(--gc-muted); font-size: 0.85rem; }
+.empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+@media (max-width: 900px) {
+  .table-header { display: none; }
+  .table-row { grid-template-columns: 1fr; gap: 0.5rem; padding: 1rem; }
+  .sidebar-toggle { display: flex !important; position: fixed; bottom: 1rem; right: 1rem; background: var(--gc-green); color: white; width: 50px; height: 50px; border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; z-index: 101; font-size: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+  .sidebar { position: fixed; bottom: 0; left: 0; right: 0; top: auto; height: auto; max-height: 80vh; transform: translateY(100%); transition: transform 0.3s ease; z-index: 100; }
+  .sidebar.open { transform: translateY(0); }
+}
 .sidebar-toggle { display: none; }
-@media (min-width: 901px) { .sidebar-toggle { display: none; } }
 </style>
