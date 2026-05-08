@@ -1,20 +1,3 @@
-<!-- 
-  KEY FIX: Supabase stores email in auth.users, not in profiles.
-  Use the admin API (supabase.auth.admin.listUsers) to get emails,
-  then merge with profiles data.
-  
-  REQUIREMENT: This requires the service_role key — only safe on the server side.
-  Since we're on the frontend, the workaround is to store email in profiles
-  on registration (recommended), OR use a Supabase Edge Function.
-  
-  QUICKEST FIX: Store email in profiles table on register.
-  Add this to your handleSignup in Register.vue (already has authStore.register):
-  
-    await supabase.from('profiles').update({ email: signupForm.value.email }).eq('id', authStore.user.id)
-  
-  Then the fetchUsers below will work correctly.
--->
-
 <template>
   <div class="dash admin-users">
     <div class="sidebar-toggle" @click="toggleSidebar">☰</div>
@@ -62,6 +45,8 @@
         </select>
         <input type="text" v-model="searchQuery" placeholder="Search by name or email..." class="search-input" />
       </div>
+
+      <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
       <div class="table-container">
         <div v-if="loading" class="loading-state">Loading users...</div>
@@ -111,6 +96,7 @@ const sidebarOpen = ref(false)
 const users = ref([])
 const roleFilter = ref('all')
 const searchQuery = ref('')
+const errorMessage = ref('')
 
 const filteredUsers = computed(() => {
   let result = users.value
@@ -134,6 +120,16 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'n
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
 
+const fetchProfiles = async () => {
+  const withEmail = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, email, role, created_at')
+    .order('created_at', { ascending: false })
+
+  if (!withEmail.error) return withEmail.data || []
+  throw new Error(`profiles: ${withEmail.error.message}`)
+}
+
 const deleteUser = async (user) => {
   if (!confirm(`Delete ${user.name}? This cannot be undone.`)) return
   try {
@@ -149,33 +145,28 @@ const deleteUser = async (user) => {
 
 const fetchUsers = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
-    // Fetch profiles
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name, email, role, created_at')
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
+    const profiles = await fetchProfiles()
 
     // Enrich with program/company
     const enriched = await Promise.all((profiles || []).map(async (profile) => {
       let programOrCompany = '—'
       if (profile.role === 'student') {
-        const { data: sp } = await supabase
+        const { data: sp, error: studentError } = await supabase
           .from('student_profiles').select('program').eq('user_id', profile.id).maybeSingle()
+        if (studentError) throw new Error(`student_profiles: ${studentError.message}`)
         programOrCompany = sp?.program || '—'
       } else if (profile.role === 'employer') {
-        const { data: ep } = await supabase
+        const { data: ep, error: employerError } = await supabase
           .from('employer_profiles').select('company_name').eq('user_id', profile.id).maybeSingle()
+        if (employerError) throw new Error(`employer_profiles: ${employerError.message}`)
         programOrCompany = ep?.company_name || '—'
       }
 
       return {
         id: profile.id,
         name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
-        // email comes from profiles.email (set during registration)
-        // if your profiles table doesn't have email yet, see comment at top of file
         email: profile.email || '',
         role: profile.role,
         programOrCompany,
@@ -186,6 +177,8 @@ const fetchUsers = async () => {
     users.value = enriched
   } catch (err) {
     console.error('Error fetching users:', err)
+    users.value = []
+    errorMessage.value = `Failed to load users: ${err.message || 'Unknown Supabase error'}`
   } finally {
     loading.value = false
   }
@@ -200,6 +193,7 @@ onMounted(() => { fetchUsers() })
 .live-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; background: rgba(151,196,89,0.15); padding: 0.3rem 0.8rem; border-radius: 20px; color: #97C459; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #97C459; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.error-banner { background: #FEF0F0; color: #B03030; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.82rem; }
 .filters-bar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .filter-select { padding: 0.5rem 0.75rem; border: 1px solid #C0DD97; border-radius: 8px; background: #fff; font-size: 0.8rem; }
 .search-input { flex: 1; max-width: 300px; padding: 0.5rem 0.75rem; border: 1px solid #C0DD97; border-radius: 8px; font-size: 0.8rem; }

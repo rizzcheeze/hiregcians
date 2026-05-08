@@ -35,6 +35,9 @@
         </div>
         <button class="btn-primary" @click="showCreateModal = true">+ New Announcement</button>
       </div>
+      <div v-if="errorMessage" class="setup-banner">
+        {{ errorMessage }}
+      </div>
 
       <!-- Announcements List -->
       <div class="announcements-container">
@@ -129,6 +132,7 @@ const sidebarOpen = ref(false)
 const announcements = ref([])
 const showCreateModal = ref(false)
 const editingAnnouncement = ref(null)
+const errorMessage = ref('')
 
 const announcementForm = ref({
   title: '',
@@ -137,6 +141,7 @@ const announcementForm = ref({
   priority: 'normal'
 })
 
+const getInitials = (name) => name ? name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : 'AD'
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Recently'
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
@@ -145,6 +150,10 @@ const closeModal = () => {
   showCreateModal.value = false
   editingAnnouncement.value = null
   announcementForm.value = { title: '', content: '', audience: 'all', priority: 'normal' }
+}
+const getInitials = (name) => {
+  if (!name) return '?'
+  return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2)
 }
 
 const editAnnouncement = (announcement) => {
@@ -165,6 +174,7 @@ const saveAnnouncement = async () => {
   }
 
   saving.value = true
+  errorMessage.value = ''
   try {
     if (editingAnnouncement.value) {
       const { error } = await supabase
@@ -197,7 +207,7 @@ const saveAnnouncement = async () => {
     fetchAnnouncements()
   } catch (error) {
     console.error('Error saving announcement:', error)
-    alert('Failed to save announcement')
+    errorMessage.value = `Failed to save announcement: ${error.message || 'Unknown Supabase error'}`
   } finally {
     saving.value = false
   }
@@ -205,6 +215,7 @@ const saveAnnouncement = async () => {
 
 const deleteAnnouncement = async (id) => {
   if (confirm('Delete this announcement? This cannot be undone.')) {
+    errorMessage.value = ''
     try {
       const { error } = await supabase.from('announcements').delete().eq('id', id)
       if (error) throw error
@@ -212,21 +223,25 @@ const deleteAnnouncement = async (id) => {
       alert('Announcement deleted')
     } catch (error) {
       console.error('Error deleting announcement:', error)
-      alert('Failed to delete announcement')
+      errorMessage.value = `Failed to delete announcement: ${error.message || 'Unknown Supabase error'}`
     }
   }
 }
 
 const fetchAnnouncements = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('announcements')
-      .select('*')
+      .select('id, title, content, audience, priority, author_id, author, created_at, updated_at')
       .order('created_at', { ascending: false })
+    if (error) throw error
     announcements.value = data || []
   } catch (error) {
     console.error('Error fetching announcements:', error)
+    announcements.value = []
+    errorMessage.value = `Failed to load announcements: ${error.message || 'Unknown Supabase error'}`
   } finally {
     loading.value = false
   }
@@ -240,6 +255,7 @@ onMounted(() => { fetchAnnouncements() })
 .s-role { font-size: 0.7rem; color: #97C459; opacity: 0.7; margin-top: 0.2rem; }
 .btn-primary { background: var(--gc-green); color: #fff; border: none; border-radius: 24px; padding: 0.5rem 1.25rem; font-size: 0.85rem; cursor: pointer; }
 .btn-outline { background: transparent; color: var(--gc-green); border: 1px solid var(--gc-green); border-radius: 24px; padding: 0.5rem 1.25rem; font-size: 0.85rem; cursor: pointer; }
+.setup-banner { background: #FFF8E7; color: #8A6100; border: 1px solid #F0D070; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.82rem; margin-bottom: 1rem; }
 .announcements-container { display: flex; flex-direction: column; gap: 1rem; }
 .announcement-card { background: #fff; border: 1px solid #C0DD97; border-radius: 12px; padding: 1.25rem; }
 .announcement-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }

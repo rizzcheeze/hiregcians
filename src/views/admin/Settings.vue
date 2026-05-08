@@ -85,6 +85,7 @@ const settings = ref({
   session_timeout: 60
 })
 
+const getInitials = (name) => name ? name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : 'AD'
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
 
@@ -92,14 +93,36 @@ const saveSettings = async () => {
   saving.value = true
   errorMessage.value = ''
   try {
-    localStorage.setItem('admin_settings', JSON.stringify(settings.value))
+    const { error } = await supabase
+      .from('admin_settings')
+      .upsert({
+        id: 1,
+        settings: settings.value,
+        updated_by: authStore.user?.id || null,
+        updated_at: new Date().toISOString()
+      })
+    if (error) throw error
     alert('Settings saved successfully!')
-  } catch (error) { errorMessage.value = error.message } finally { saving.value = false }
+  } catch (error) {
+    console.error('Error saving settings:', error)
+    errorMessage.value = `Failed to save settings: ${error.message || 'Unknown Supabase error'}`
+  } finally { saving.value = false }
 }
 
-const loadSettings = () => {
-  const saved = localStorage.getItem('admin_settings')
-  if (saved) settings.value = { ...settings.value, ...JSON.parse(saved) }
+const loadSettings = async () => {
+  errorMessage.value = ''
+  try {
+    const { data, error } = await supabase
+      .from('admin_settings')
+      .select('id, settings, updated_by, updated_at')
+      .eq('id', 1)
+      .maybeSingle()
+    if (error) throw error
+    if (data?.settings) settings.value = { ...settings.value, ...data.settings }
+  } catch (error) {
+    console.warn('Admin settings table unavailable:', error.message)
+    errorMessage.value = `Failed to load settings: ${error.message || 'Unknown Supabase error'}`
+  }
 }
 
 onMounted(() => { loadSettings() })
@@ -110,6 +133,7 @@ onMounted(() => { loadSettings() })
 .s-role { font-size: 0.7rem; color: #97C459; opacity: 0.7; margin-top: 0.2rem; }
 .btn-primary { background: var(--gc-green); color: #fff; border: none; border-radius: 24px; padding: 0.5rem 1.25rem; cursor: pointer; }
 .error-banner { background: #FEF0F0; color: #B03030; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; }
+.setup-banner { background: #FFF8E7; color: #8A6100; border: 1px solid #F0D070; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.82rem; margin-bottom: 1rem; }
 .settings-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .card { background: #fff; border-radius: 12px; border: 1px solid #C0DD97; overflow: hidden; margin-bottom: 1.5rem; }
 .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid #EAF3DE; }

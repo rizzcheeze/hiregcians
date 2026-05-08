@@ -35,6 +35,7 @@
         </div>
         <div class="live-badge"><div class="live-dot"></div> System Live</div>
       </div>
+      <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
       <div class="filters-bar">
         <select v-model="statusFilter" class="filter-select">
@@ -97,6 +98,7 @@ const sidebarOpen = ref(false)
 const jobs = ref([])
 const statusFilter = ref('all')
 const searchQuery = ref('')
+const errorMessage = ref('')
 
 const filteredJobs = computed(() => {
   let result = jobs.value
@@ -105,26 +107,48 @@ const filteredJobs = computed(() => {
   return result
 })
 
+const getInitials = (name) => {
+  if (!name) return '?'
+  return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2)
+}
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Recently'
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
 const viewJob = (job) => { alert(`View job: ${job.title}\n\nDetailed view coming soon.`) }
 const closeJob = async (job) => { if (confirm(`Close "${job.title}"?`)) { try { await supabase.from('jobs').update({ status: 'closed' }).eq('id', job.id); job.status = 'closed'; alert('Job closed') } catch (error) { alert('Failed to close job') } } }
 const reopenJob = async (job) => { if (confirm(`Reopen "${job.title}"?`)) { try { await supabase.from('jobs').update({ status: 'active' }).eq('id', job.id); job.status = 'active'; alert('Job reopened') } catch (error) { alert('Failed to reopen job') } } }
-const deleteJob = async (job) => { if (confirm(`Delete "${job.title}"? This cannot be undone.`)) { try { await supabase.from('applications').delete().eq('job_id', job.id); await supabase.from('saved_jobs').delete().eq('job_id', job.id); await supabase.from('jobs').delete().eq('id', job.id); jobs.value = jobs.value.filter(j => j.id !== job.id); alert('Job deleted') } catch (error) { alert('Failed to delete job') } } }
+const deleteJob = async (job) => { if (confirm(`Delete "${job.title}"? This cannot be undone.`)) { try { await supabase.from('applications').delete().eq('job_id', job.id); const saved = await supabase.from('saved_jobs').delete().eq('job_id', job.id); if (saved.error) console.warn('saved_jobs cleanup skipped:', saved.error.message); await supabase.from('match_scores').delete().eq('job_id', job.id); await supabase.from('jobs').delete().eq('id', job.id); jobs.value = jobs.value.filter(j => j.id !== job.id); alert('Job deleted') } catch (error) { console.error(error); alert('Failed to delete job') } } }
+
+const safeCount = async (table, apply = query => query) => {
+  const { count, error } = await apply(supabase.from(table).select('*', { count: 'exact', head: true }))
+  if (error) throw new Error(`${table}: ${error.message}`)
+  return count || 0
+}
+
+const safeSelect = async (table, columns = '*', apply = query => query) => {
+  const { data, error } = await apply(supabase.from(table).select(columns))
+  if (error) throw new Error(`${table}: ${error.message}`)
+  return data || []
+}
 
 const fetchJobs = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
-    const { data: allJobs } = await supabase.from('jobs').select('*').order('posted_at', { ascending: false })
+    const allJobs = await safeSelect('jobs', 'id, employer_id, title, job_type, work_setup, slots, status, posted_at', q => q.order('posted_at', { ascending: false }))
     jobs.value = await Promise.all((allJobs || []).map(async (job) => {
-      const { data: employer } = await supabase.from('employer_profiles').select('company_name').eq('user_id', job.employer_id).maybeSingle()
-      const { count: applicantCount } = await supabase.from('applications').select('*', { count: 'exact', head: true }).eq('job_id', job.id)
-      const { data: matchScores } = await supabase.from('match_scores').select('score').eq('job_id', job.id)
+      const { data: employer, error: employerError } = await supabase.from('employer_profiles').select('company_name').eq('user_id', job.employer_id).maybeSingle()
+      if (employerError) throw new Error(`employer_profiles: ${employerError.message}`)
+      const applicantCount = await safeCount('applications', q => q.eq('job_id', job.id))
+      const matchScores = await safeSelect('match_scores', 'score', q => q.eq('job_id', job.id))
       const avgMatch = matchScores?.length ? Math.round(matchScores.reduce((a, b) => a + b.score, 0) / matchScores.length * 100) : 0
       return { id: job.id, title: job.title, employer_name: employer?.company_name || 'Unknown', applicant_count: applicantCount || 0, avg_match_score: avgMatch, posted_at: job.posted_at, status: job.status }
     }))
-  } catch (error) { console.error('Error fetching jobs:', error) } finally { loading.value = false }
+  } catch (error) {
+    console.error('Error fetching jobs:', error)
+    jobs.value = []
+    errorMessage.value = `Failed to load listings: ${error.message || 'Unknown Supabase error'}`
+  } finally { loading.value = false }
 }
 
 onMounted(() => { fetchJobs() })
@@ -136,6 +160,7 @@ onMounted(() => { fetchJobs() })
 .live-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; background: rgba(151,196,89,0.15); padding: 0.3rem 0.8rem; border-radius: 20px; color: #97C459; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #97C459; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.error-banner { background: #FEF0F0; color: #B03030; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.82rem; }
 .filters-bar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .filter-select { padding: 0.5rem 0.75rem; border: 1px solid #C0DD97; border-radius: 8px; background: #fff; font-size: 0.8rem; }
 .search-input { flex: 1; max-width: 300px; padding: 0.5rem 0.75rem; border: 1px solid #C0DD97; border-radius: 8px; font-size: 0.8rem; }

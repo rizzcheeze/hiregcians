@@ -46,6 +46,7 @@
         <button class="btn-primary" @click="generateReport">Generate Report</button>
         <button class="btn-outline" @click="exportReport" :disabled="!reportData">Export CSV</button>
       </div>
+      <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
       <div v-if="generating" class="loading-state">Generating report...</div>
       <div v-else-if="reportData" class="report-container">
@@ -91,17 +92,17 @@
                 </template>
                 <template v-else-if="reportType === 'jobs'">
                   <tr v-for="j in reportData.data" :key="j.id">
-                    <td>{{ j.title }}</td><td>{{ j.employer_profiles?.company_name || 'N/A' }}</td><td>{{ formatDate(j.posted_at) }}</td><td>{{ j.status }}</td>
+                    <td>{{ j.title }}</td><td>{{ j.employer_name || 'N/A' }}</td><td>{{ formatDate(j.posted_at) }}</td><td>{{ j.status }}</td>
                   </tr>
                 </template>
                 <template v-else-if="reportType === 'applications'">
                   <tr v-for="a in reportData.data" :key="a.id">
-                    <td>{{ a.profiles?.first_name }} {{ a.profiles?.last_name }}</td><td>{{ a.jobs?.title }}</td><td>{{ formatDate(a.applied_at) }}</td><td>{{ a.status }}</td>
+                    <td>{{ a.student_name }}</td><td>{{ a.job_title }}</td><td>{{ formatDate(a.applied_at) }}</td><td>{{ a.status }}</td>
                   </tr>
                 </template>
                 <template v-else-if="reportType === 'matches'">
                   <tr v-for="m in reportData.data" :key="m.id">
-                    <td>{{ m.profiles?.first_name }} {{ m.profiles?.last_name }}</td><td>{{ m.jobs?.title }}</td><td>{{ Math.round(m.score * 100) }}%</td><td class="rationale-cell">{{ m.rationale }}</td>
+                    <td>{{ m.student_name }}</td><td>{{ m.job_title }}</td><td>{{ Math.round((m.score || 0) * 100) }}%</td><td class="rationale-cell">{{ m.rationale || 'No rationale available' }}</td>
                   </tr>
                 </template>
               </tbody>
@@ -128,44 +129,94 @@ const generating = ref(false)
 const reportData = ref(null)
 const reportTitle = ref('')
 const reportType = ref('overview')
+const errorMessage = ref('')
 const startDate = ref(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
 const endDate = ref(new Date().toISOString().split('T')[0])
 
+const getInitials = (name) => name ? name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) : 'AD'
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
 const formatDate = (d) => d ? new Date(d).toLocaleDateString() : 'N/A'
 
+const safeCount = async (table, apply = query => query) => {
+  const { count, error } = await apply(supabase.from(table).select('*', { count: 'exact', head: true }))
+  if (error) throw new Error(`${table}: ${error.message}`)
+  return count || 0
+}
+
+const safeSelect = async (table, columns = '*', apply = query => query) => {
+  const { data, error } = await apply(supabase.from(table).select(columns))
+  if (error) throw new Error(`${table}: ${error.message}`)
+  return data || []
+}
+
+const applyDateRange = (query, column) => {
+  let next = query
+  if (startDate.value) next = next.gte(column, new Date(`${startDate.value}T00:00:00`).toISOString())
+  if (endDate.value) next = next.lte(column, new Date(`${endDate.value}T23:59:59`).toISOString())
+  return next
+}
+
 const generateReport = async () => {
   generating.value = true
+  errorMessage.value = ''
   try {
     if (reportType.value === 'overview') {
-      const { count: users } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
-      const { count: students } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student')
-      const { count: employers } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'employer')
-      const { count: jobs } = await supabase.from('jobs').select('*', { count: 'exact', head: true })
-      const { count: activeJobs } = await supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'active')
-      const { count: applications } = await supabase.from('applications').select('*', { count: 'exact', head: true })
-      const { count: hired } = await supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'hired')
+      const [users, profileStudents, profileEmployers, studentProfiles, employerProfiles, jobs, activeJobs, applications, hired] = await Promise.all([
+        safeCount('profiles'),
+        safeCount('profiles', q => q.eq('role', 'student')),
+        safeCount('profiles', q => q.eq('role', 'employer')),
+        safeCount('student_profiles'),
+        safeCount('employer_profiles'),
+        safeCount('jobs'),
+        safeCount('jobs', q => q.eq('status', 'active')),
+        safeCount('applications'),
+        safeCount('applications', q => q.eq('status', 'hired'))
+      ])
+      const students = profileStudents || studentProfiles
+      const employers = profileEmployers || employerProfiles
       reportTitle.value = 'Platform Overview Report'
-      reportData.value = { total: users || 0, active: activeJobs || 0, inactive: (users || 0) - (activeJobs || 0), percentage: users ? Math.round((activeJobs || 0) / users * 100) : 0, data: { students: students || 0, employers: employers || 0, total_jobs: jobs || 0, active_jobs: activeJobs || 0, total_applications: applications || 0, hired_students: hired || 0 } }
+      reportData.value = { total: users || 0, active: activeJobs || 0, inactive: Math.max((jobs || 0) - (activeJobs || 0), 0), percentage: jobs ? Math.round((activeJobs || 0) / jobs * 100) : 0, data: { students: students || 0, employers: employers || 0, total_jobs: jobs || 0, active_jobs: activeJobs || 0, total_applications: applications || 0, hired_students: hired || 0 } }
     } else if (reportType.value === 'users') {
-      const { data: users } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      const users = await safeSelect('profiles', 'id, first_name, last_name, email, role, created_at, is_active', q => applyDateRange(q, 'created_at').order('created_at', { ascending: false }))
       reportTitle.value = 'User Report'
       reportData.value = { total: users?.length || 0, active: users?.filter(u => u.is_active !== false).length || 0, inactive: users?.filter(u => u.is_active === false).length || 0, percentage: users?.length ? Math.round(users.filter(u => u.is_active !== false).length / users.length * 100) : 0, data: users || [] }
     } else if (reportType.value === 'jobs') {
-      const { data: jobs } = await supabase.from('jobs').select('*, employer_profiles(company_name)').order('posted_at', { ascending: false })
+      const jobs = await safeSelect('jobs', 'id, employer_id, title, status, posted_at', q => applyDateRange(q, 'posted_at').order('posted_at', { ascending: false }))
+      const employerIds = [...new Set(jobs.map(j => j.employer_id).filter(Boolean))]
+      const employers = employerIds.length ? await safeSelect('employer_profiles', 'user_id, company_name', q => q.in('user_id', employerIds)) : []
+      const employerMap = new Map(employers.map(e => [e.user_id, e.company_name]))
+      const enrichedJobs = jobs.map(job => ({ ...job, employer_name: employerMap.get(job.employer_id) || 'N/A' }))
       reportTitle.value = 'Jobs Report'
-      reportData.value = { total: jobs?.length || 0, active: jobs?.filter(j => j.status === 'active').length || 0, inactive: jobs?.filter(j => j.status !== 'active').length || 0, percentage: jobs?.length ? Math.round(jobs.filter(j => j.status === 'active').length / jobs.length * 100) : 0, data: jobs || [] }
+      reportData.value = { total: enrichedJobs.length, active: enrichedJobs.filter(j => j.status === 'active').length, inactive: enrichedJobs.filter(j => j.status !== 'active').length, percentage: enrichedJobs.length ? Math.round(enrichedJobs.filter(j => j.status === 'active').length / enrichedJobs.length * 100) : 0, data: enrichedJobs }
     } else if (reportType.value === 'applications') {
-      const { data: apps } = await supabase.from('applications').select('*, profiles(first_name,last_name), jobs(title)').order('applied_at', { ascending: false })
+      const apps = await safeSelect('applications', 'id, student_id, job_id, status, applied_at, reviewed_at, match_score', q => applyDateRange(q, 'applied_at').order('applied_at', { ascending: false }))
+      const studentIds = [...new Set(apps.map(a => a.student_id).filter(Boolean))]
+      const jobIds = [...new Set(apps.map(a => a.job_id).filter(Boolean))]
+      const profiles = studentIds.length ? await safeSelect('profiles', 'id, first_name, last_name', q => q.in('id', studentIds)) : []
+      const jobs = jobIds.length ? await safeSelect('jobs', 'id, title', q => q.in('id', jobIds)) : []
+      const profileMap = new Map(profiles.map(p => [p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown']))
+      const jobMap = new Map(jobs.map(j => [j.id, j.title]))
+      const enrichedApps = apps.map(app => ({ ...app, student_name: profileMap.get(app.student_id) || 'Unknown', job_title: jobMap.get(app.job_id) || 'Unknown' }))
       reportTitle.value = 'Applications Report'
-      reportData.value = { total: apps?.length || 0, active: apps?.filter(a => a.status !== 'rejected').length || 0, inactive: apps?.filter(a => a.status === 'rejected').length || 0, percentage: apps?.length ? Math.round(apps.filter(a => a.status !== 'rejected').length / apps.length * 100) : 0, data: apps || [] }
+      reportData.value = { total: enrichedApps.length, active: enrichedApps.filter(a => a.status !== 'rejected').length, inactive: enrichedApps.filter(a => a.status === 'rejected').length, percentage: enrichedApps.length ? Math.round(enrichedApps.filter(a => a.status !== 'rejected').length / enrichedApps.length * 100) : 0, data: enrichedApps }
     } else if (reportType.value === 'matches') {
-      const { data: matches } = await supabase.from('match_scores').select('*, profiles(first_name,last_name), jobs(title)').order('computed_at', { ascending: false })
+      const matches = await safeSelect('match_scores', 'id, student_id, job_id, score, rationale, computed_at', q => applyDateRange(q, 'computed_at').order('computed_at', { ascending: false }))
+      const studentIds = [...new Set(matches.map(m => m.student_id).filter(Boolean))]
+      const jobIds = [...new Set(matches.map(m => m.job_id).filter(Boolean))]
+      const profiles = studentIds.length ? await safeSelect('profiles', 'id, first_name, last_name', q => q.in('id', studentIds)) : []
+      const jobs = jobIds.length ? await safeSelect('jobs', 'id, title', q => q.in('id', jobIds)) : []
+      const profileMap = new Map(profiles.map(p => [p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown']))
+      const jobMap = new Map(jobs.map(j => [j.id, j.title]))
+      const enrichedMatches = matches.map(match => ({ ...match, student_name: profileMap.get(match.student_id) || 'Unknown', job_title: jobMap.get(match.job_id) || 'Unknown' }))
       reportTitle.value = 'AI Match Report'
-      reportData.value = { total: matches?.length || 0, active: matches?.filter(m => m.score >= 0.5).length || 0, inactive: matches?.filter(m => m.score < 0.5).length || 0, percentage: matches?.length ? Math.round(matches.filter(m => m.score >= 0.5).length / matches.length * 100) : 0, data: matches || [] }
+      reportData.value = { total: enrichedMatches.length, active: enrichedMatches.filter(m => m.score >= 0.5).length, inactive: enrichedMatches.filter(m => m.score < 0.5).length, percentage: enrichedMatches.length ? Math.round(enrichedMatches.filter(m => m.score >= 0.5).length / enrichedMatches.length * 100) : 0, data: enrichedMatches }
     }
-  } catch (error) { console.error('Error generating report:', error); alert('Failed to generate report') } finally { generating.value = false }
+  } catch (error) {
+    console.error('Error generating report:', error)
+    reportData.value = null
+    errorMessage.value = `Failed to generate report: ${error.message || 'Unknown Supabase error'}`
+  } finally { generating.value = false }
 }
 
 const exportReport = () => {
@@ -181,8 +232,8 @@ const exportReport = () => {
 }
 
 const convertToCSV = (data) => {
-  if (!data || !data.length) return ''
   const isArray = Array.isArray(data)
+  if (!data || (isArray && !data.length)) return ''
   const rows = isArray ? data : [data]
   const headers = Object.keys(rows[0])
   const csvRows = [headers.join(',')]
@@ -197,6 +248,7 @@ const convertToCSV = (data) => {
 .live-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; background: rgba(151,196,89,0.15); padding: 0.3rem 0.8rem; border-radius: 20px; color: #97C459; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #97C459; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.error-banner { background: #FEF0F0; color: #B03030; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.82rem; }
 .btn-primary { background: var(--gc-green); color: #fff; border: none; border-radius: 24px; padding: 0.5rem 1rem; font-size: 0.8rem; cursor: pointer; }
 .btn-outline { background: transparent; color: var(--gc-green); border: 1px solid var(--gc-green); border-radius: 24px; padding: 0.5rem 1rem; font-size: 0.8rem; cursor: pointer; }
 .filters-bar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }

@@ -38,6 +38,8 @@
         </div>
       </div>
 
+      <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
+
       <div class="metrics-grid">
         <div class="metric-card">
           <div class="metric-value">{{ stats.students }}</div>
@@ -160,6 +162,7 @@ const recentJobs = ref([])
 const recentActivities = ref([])
 const activeSessions = ref(0)
 const storageUsage = ref(0)
+const errorMessage = ref('')
 
 const stats = ref({
   students: 0,
@@ -211,7 +214,22 @@ const handleLogout = async () => {
   router.push('/')
 }
 
+const safeCount = async (table, apply = query => query) => {
+  const query = apply(supabase.from(table).select('*', { count: 'exact', head: true }))
+  const { count, error } = await query
+  if (error) throw new Error(`${table}: ${error.message}`)
+  return count || 0
+}
+
+const safeSelect = async (table, columns = '*', apply = query => query) => {
+  const query = apply(supabase.from(table).select(columns))
+  const { data, error } = await query
+  if (error) throw new Error(`${table}: ${error.message}`)
+  return data || []
+}
+
 const fetchDashboardData = async () => {
+  errorMessage.value = ''
   try {
     const now = new Date()
     const weekAgo = new Date()
@@ -223,60 +241,44 @@ const fetchDashboardData = async () => {
     const weekAgoStr = weekAgo.toISOString()
     const monthAgoStr = monthAgo.toISOString()
     
-    // Get all counts
-    const { count: studentCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student')
-    const { count: employerCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'employer')
-    const { count: activeJobsCount } = await supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'active')
-    const { count: applicationsCount } = await supabase.from('applications').select('*', { count: 'exact', head: true })
-    const { count: hiredCount } = await supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'hired')
-    
-    // Get new users this week
-    const { count: newStudentsCount } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'student')
-      .gte('created_at', weekAgoStr)
-    
-    const { count: newEmployersCount } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'employer')
-      .gte('created_at', weekAgoStr)
-    
-    // Get new jobs this week
-    const { count: newJobsCount } = await supabase
-      .from('jobs')
-      .select('*', { count: 'exact', head: true })
-      .gte('posted_at', weekAgoStr)
-    
-    // Get new applications this week
-    const { count: newApplicationsCount } = await supabase
-      .from('applications')
-      .select('*', { count: 'exact', head: true })
-      .gte('applied_at', weekAgoStr)
-    
-    // Get hires this month
-    const { count: hiredThisMonthCount } = await supabase
-      .from('applications')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'hired')
-      .gte('reviewed_at', monthAgoStr)
+    const [
+      profileStudentCount,
+      profileEmployerCount,
+      studentProfileCount,
+      employerProfileCount,
+      activeJobsCount,
+      applicationsCount,
+      hiredCount,
+      newStudentsCount,
+      newEmployersCount,
+      newJobsCount,
+      newApplicationsCount,
+      hiredThisMonthCount
+    ] = await Promise.all([
+      safeCount('profiles', q => q.eq('role', 'student')),
+      safeCount('profiles', q => q.eq('role', 'employer')),
+      safeCount('student_profiles'),
+      safeCount('employer_profiles'),
+      safeCount('jobs', q => q.eq('status', 'active')),
+      safeCount('applications'),
+      safeCount('applications', q => q.eq('status', 'hired')),
+      safeCount('profiles', q => q.eq('role', 'student').gte('created_at', weekAgoStr)),
+      safeCount('profiles', q => q.eq('role', 'employer').gte('created_at', weekAgoStr)),
+      safeCount('jobs', q => q.gte('posted_at', weekAgoStr)),
+      safeCount('applications', q => q.gte('applied_at', weekAgoStr)),
+      safeCount('applications', q => q.eq('status', 'hired').gte('reviewed_at', monthAgoStr))
+    ])
+
+    const studentCount = profileStudentCount || studentProfileCount
+    const employerCount = profileEmployerCount || employerProfileCount
     
     // Get match score average
-    const { data: matchScores } = await supabase.from('match_scores').select('score')
+    const matchScores = await safeSelect('match_scores', 'score')
     const avgScore = matchScores?.length ? Math.round(matchScores.reduce((a, b) => a + b.score, 0) / matchScores.length * 100) : 0
     
     // Get match score change
-    const { data: recentMatches } = await supabase
-      .from('match_scores')
-      .select('score, computed_at')
-      .gte('computed_at', monthAgoStr)
-    
-    const { data: olderMatches } = await supabase
-      .from('match_scores')
-      .select('score, computed_at')
-      .lt('computed_at', monthAgoStr)
-      .gte('computed_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+    const recentMatches = await safeSelect('match_scores', 'score, computed_at', q => q.gte('computed_at', monthAgoStr))
+    const olderMatches = await safeSelect('match_scores', 'score, computed_at', q => q.lt('computed_at', monthAgoStr).gte('computed_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()))
     
     const recentAvg = recentMatches?.length ? recentMatches.reduce((a, b) => a + b.score, 0) / recentMatches.length * 100 : 0
     const olderAvg = olderMatches?.length ? olderMatches.reduce((a, b) => a + b.score, 0) / olderMatches.length * 100 : 0
@@ -298,27 +300,25 @@ const fetchDashboardData = async () => {
     }
 
     // Get recent users
-    const { data: users } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name, role, created_at')
-      .order('created_at', { ascending: false })
-      .limit(5)
+    const users = await safeSelect('profiles', 'id, first_name, last_name, role, created_at', q => q.order('created_at', { ascending: false }).limit(5))
     
     recentUsers.value = await Promise.all((users || []).map(async (user) => {
       let programOrCompany = ''
       if (user.role === 'student') {
-        const { data: student } = await supabase
+        const { data: student, error: studentError } = await supabase
           .from('student_profiles')
           .select('program')
           .eq('user_id', user.id)
           .maybeSingle()
+        if (studentError) throw new Error(`student_profiles: ${studentError.message}`)
         programOrCompany = student?.program || 'N/A'
       } else if (user.role === 'employer') {
-        const { data: employer } = await supabase
+        const { data: employer, error: employerError } = await supabase
           .from('employer_profiles')
           .select('company_name')
           .eq('user_id', user.id)
           .maybeSingle()
+        if (employerError) throw new Error(`employer_profiles: ${employerError.message}`)
         programOrCompany = employer?.company_name || 'N/A'
       }
       return {
@@ -331,28 +331,19 @@ const fetchDashboardData = async () => {
     }))
 
     // Get recent jobs
-    const { data: jobs } = await supabase
-      .from('jobs')
-      .select('id, title, employer_id, status, posted_at')
-      .order('posted_at', { ascending: false })
-      .limit(5)
+    const jobs = await safeSelect('jobs', 'id, title, employer_id, status, posted_at', q => q.order('posted_at', { ascending: false }).limit(5))
     
     recentJobs.value = await Promise.all((jobs || []).map(async (job) => {
-      const { data: employer } = await supabase
+      const { data: employer, error: employerError } = await supabase
         .from('employer_profiles')
         .select('company_name')
         .eq('user_id', job.employer_id)
         .maybeSingle()
+      if (employerError) throw new Error(`employer_profiles: ${employerError.message}`)
       
-      const { count: applicantCount } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('job_id', job.id)
+      const applicantCount = await safeCount('applications', q => q.eq('job_id', job.id))
       
-      const { data: jobMatchScores } = await supabase
-        .from('match_scores')
-        .select('score')
-        .eq('job_id', job.id)
+      const jobMatchScores = await safeSelect('match_scores', 'score', q => q.eq('job_id', job.id))
       
       const avgMatch = jobMatchScores?.length
         ? Math.round(jobMatchScores.reduce((a, b) => a + b.score, 0) / jobMatchScores.length * 100)
@@ -369,41 +360,32 @@ const fetchDashboardData = async () => {
     }))
 
     // Get active sessions
-    const { count: activeCount } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', weekAgoStr)
-    
-    activeSessions.value = activeCount || 0
+    activeSessions.value = newStudentsCount + newEmployersCount
     
     // Get storage usage
-    const { data: storageFiles } = await supabase.storage
-      .from('resumes')
-      .list()
-    
+    const { data: storageFiles, error: storageError } = await supabase.storage.from('resumes').list()
+    if (storageError) console.warn('Storage usage unavailable:', storageError.message)
     const estimatedMB = (storageFiles?.length || 0) * 0.5
     storageUsage.value = Math.round(estimatedMB)
     
     // Get recent activities
-    const { data: recentApps } = await supabase
-      .from('applications')
-      .select('id, applied_at, student_id, job_id')
-      .order('applied_at', { ascending: false })
-      .limit(5)
+    const recentApps = await safeSelect('applications', 'id, applied_at, student_id, job_id', q => q.order('applied_at', { ascending: false }).limit(5))
     
     if (recentApps && recentApps.length > 0) {
       const studentIds = recentApps.map(a => a.student_id)
       const jobIds = recentApps.map(a => a.job_id)
       
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
         .in('id', studentIds)
+      if (profilesError) throw new Error(`profiles: ${profilesError.message}`)
       
-      const { data: jobsData } = await supabase
+      const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('id, title')
         .in('id', jobIds)
+      if (jobsError) throw new Error(`jobs: ${jobsError.message}`)
       
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
       const jobMap = new Map(jobsData?.map(j => [j.id, j]) || [])
@@ -420,6 +402,7 @@ const fetchDashboardData = async () => {
     
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
+    errorMessage.value = `Failed to load overview: ${error.message || 'Unknown Supabase error'}`
   }
 }
 
@@ -434,6 +417,7 @@ onMounted(() => {
 .live-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; background: rgba(151,196,89,0.15); padding: 0.3rem 0.8rem; border-radius: 20px; color: #97C459; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #97C459; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.error-banner { background: #FEF0F0; color: #B03030; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.82rem; }
 .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
 .metric-card { background: #fff; border: 1px solid #C0DD97; border-radius: 12px; padding: 1rem; }
 .metric-value { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--gc-green); }
