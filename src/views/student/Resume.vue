@@ -39,15 +39,22 @@
           <div class="card">
             <div class="card-title">Resume upload</div>
             <div style="font-size:0.82rem;color:var(--gc-muted);line-height:1.7;margin-bottom:1rem">
-              Upload a PDF resume. Students do not manually enter skills in the profile. 
-              The platform uses resume content to support extraction, matching, and profile strength analysis.
+              Upload a PDF resume. The platform uses resume content to extract skills, support matching, and analyze profile strength.
             </div>
             <input type="file" accept=".pdf" @change="handleFileSelect" class="form-input" style="margin-bottom:0.75rem" />
             <button class="btn-sm" @click="uploadResume" :disabled="!selectedFile || uploading">
-              {{ uploading ? 'Uploading & Analyzing...' : 'Analyze PDF resume' }}
+              {{ uploading ? uploadStatus || 'Processing...' : 'Analyze PDF resume' }}
             </button>
-            <div v-if="uploadStatus" class="upload-status" :class="{ 'status-success': uploadSuccess, 'status-error': !uploadSuccess }">
+            <div v-if="uploadStatus && !uploading" class="upload-status" :class="{ 'status-success': uploadSuccess, 'status-error': !uploadSuccess }">
               {{ uploadStatus }}
+            </div>
+            <!-- Step indicator while uploading -->
+            <div v-if="uploading" class="upload-steps">
+              <div class="step" :class="{ active: uploadStep >= 1, done: uploadStep > 1 }">1. Reading PDF</div>
+              <div class="step" :class="{ active: uploadStep >= 2, done: uploadStep > 2 }">2. Uploading file</div>
+              <div class="step" :class="{ active: uploadStep >= 3, done: uploadStep > 3 }">3. AI analyzing</div>
+              <div class="step" :class="{ active: uploadStep >= 4, done: uploadStep > 4 }">4. Saving skills</div>
+              <div class="step" :class="{ active: uploadStep >= 5, done: uploadStep > 5 }">5. Computing matches</div>
             </div>
           </div>
 
@@ -99,6 +106,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const uploading = ref(false)
+const uploadStep = ref(0)
 const selectedFile = ref(null)
 const uploadStatus = ref('')
 const uploadSuccess = ref(false)
@@ -110,8 +118,8 @@ const program = ref('')
 const section = ref('')
 
 const firstName = computed(() => authStore.profile?.first_name || '')
-const lastName = computed(() => authStore.profile?.last_name || '')
-const initials = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
+const lastName  = computed(() => authStore.profile?.last_name || '')
+const initials  = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
 
 const handleLogout = async () => {
   await authStore.logout()
@@ -137,8 +145,7 @@ const extractTextFromPDF = async (file) => {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
     const textContent = await page.getTextContent()
-    const pageText = textContent.items.map(item => item.str).join(' ')
-    fullText += pageText + '\n'
+    fullText += textContent.items.map(item => item.str).join(' ') + '\n'
   }
   return fullText.trim()
 }
@@ -150,33 +157,47 @@ const uploadResume = async () => {
   }
 
   uploading.value = true
-  uploadStatus.value = 'Reading PDF...'
+  uploadStep.value = 1
+  uploadStatus.value = ''
   uploadSuccess.value = false
 
   try {
+    // Step 1 — Extract text from PDF
     const extractedText = await extractTextFromPDF(selectedFile.value)
     if (!extractedText || extractedText.length < 50) {
-      throw new Error('Could not extract enough text from PDF')
+      throw new Error('Could not extract enough text from the PDF. Make sure it is not a scanned image.')
     }
 
-    uploadStatus.value = 'Uploading...'
+    // Step 2 — Upload file to storage
+    uploadStep.value = 2
     const fileExt = selectedFile.value.name.split('.').pop()
     const fileName = `${authStore.user.id}/${Date.now()}.${fileExt}`
     const { error: uploadError } = await supabase.storage.from('resumes').upload(fileName, selectedFile.value)
-    if (uploadError) throw uploadError
+    if (uploadError) throw new Error('File upload failed: ' + uploadError.message)
     const { data: urlData } = supabase.storage.from('resumes').getPublicUrl(fileName)
     const resumeUrl = urlData.publicUrl
 
-    uploadStatus.value = 'AI analyzing...'
-    const { data, error } = await supabase.functions.invoke('parse-resume', { body: { text: extractedText } })
-    if (error || !data || data.error) {
-      throw new Error(data?.error || error?.message || 'AI analysis failed')
-    }
+    // Step 3 — AI analysis via Edge Function
+    uploadStep.value = 3
+    const { data, error } = await supabase.functions.invoke('parse-resume', {
+      body: { text: extractedText }
+    })
+    if (error) throw new Error('AI analysis failed: ' + error.message)
+    if (data?.error) throw new Error('AI analysis failed: ' + data.error)
+    if (!data?.skills?.length) throw new Error('AI could not extract skills from this resume. Try a different PDF.')
+
+    // Step 4 — Save to resumes table + update student_profiles.skills
+    uploadStep.value = 4
 
     // Deactivate old resumes
-    await supabase.from('resumes').update({ is_active: false }).eq('student_id', authStore.user.id).eq('is_active', true)
+    await supabase
+      .from('resumes')
+      .update({ is_active: false })
+      .eq('student_id', authStore.user.id)
+      .eq('is_active', true)
 
-    const resumeData = {
+    // Insert new resume record
+    const { error: saveError } = await supabase.from('resumes').insert({
       student_id: authStore.user.id,
       file_url: resumeUrl,
       is_active: true,
@@ -185,44 +206,82 @@ const uploadResume = async () => {
       parsed_experience: data.achievements.map(a => ({ description: a, quantifiable: true })),
       ai_summary: data.summary,
       recruiter_tip: data.recruiterTip
+    })
+    if (saveError) throw new Error('Failed to save resume: ' + saveError.message)
+
+    // Update skills on student profile
+    const { error: skillsError } = await supabase
+      .from('student_profiles')
+      .update({ skills: data.skills })
+      .eq('user_id', authStore.user.id)
+    if (skillsError) throw new Error('Failed to save skills: ' + skillsError.message)
+
+    // Verify skills were actually saved before computing matches
+    const { data: verifyProfile } = await supabase
+      .from('student_profiles')
+      .select('skills')
+      .eq('user_id', authStore.user.id)
+      .maybeSingle()
+    if (!verifyProfile?.skills?.length) {
+      throw new Error('Skills were not saved correctly. Please try uploading again.')
     }
-    const { error: saveError } = await supabase.from('resumes').insert(resumeData)
-    if (saveError) throw saveError
 
-    await supabase.from('student_profiles').update({ skills: data.skills }).eq('user_id', authStore.user.id)
-
-    uploadStatus.value = 'Computing job match scores...'
+    // Step 5 — Compute match scores
+    uploadStep.value = 5
     await computeMatchesForStudent(authStore.user.id)
 
+    // Done — update UI
     extractedSkills.value = data.skills
     achievements.value = data.achievements
     aiSummary.value = data.summary
     recruiterTip.value = data.recruiterTip
 
-    uploadStatus.value = 'Success! Job match scores are ready.'
+    uploadStatus.value = 'Resume analyzed successfully. Job match scores are ready.'
     uploadSuccess.value = true
   } catch (error) {
-    console.error(error)
-    uploadStatus.value = 'Error: ' + error.message
+    console.error('Resume upload error:', error)
+    uploadStatus.value = error.message || 'Something went wrong. Please try again.'
     uploadSuccess.value = false
   } finally {
     uploading.value = false
+    uploadStep.value = 0
   }
 }
 
 const fetchExistingResume = async () => {
-  const { data: profile } = await supabase.from('student_profiles').select('program, section, skills').eq('user_id', authStore.user.id).maybeSingle()
-  if (profile) {
-    program.value = profile.program || ''
-    section.value = profile.section || ''
-    extractedSkills.value = profile.skills || []
-  }
-  const { data: resume } = await supabase.from('resumes').select('*').eq('student_id', authStore.user.id).eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  if (resume) {
-    if (resume.parsed_skills) extractedSkills.value = resume.parsed_skills
-    if (resume.parsed_experience) achievements.value = resume.parsed_experience.filter(e => e.quantifiable).map(e => e.description)
-    if (resume.ai_summary) aiSummary.value = resume.ai_summary
-    if (resume.recruiter_tip) recruiterTip.value = resume.recruiter_tip
+  try {
+    const { data: profile } = await supabase
+      .from('student_profiles')
+      .select('program, section, skills')
+      .eq('user_id', authStore.user.id)
+      .maybeSingle()
+    if (profile) {
+      program.value = profile.program || ''
+      section.value = profile.section || ''
+      extractedSkills.value = profile.skills || []
+    }
+
+    const { data: resume } = await supabase
+      .from('resumes')
+      .select('*')
+      .eq('student_id', authStore.user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (resume) {
+      if (resume.parsed_skills?.length) extractedSkills.value = resume.parsed_skills
+      if (resume.parsed_experience?.length) {
+        achievements.value = resume.parsed_experience
+          .filter(e => e.quantifiable)
+          .map(e => e.description)
+      }
+      if (resume.ai_summary) aiSummary.value = resume.ai_summary
+      if (resume.recruiter_tip) recruiterTip.value = resume.recruiter_tip
+    }
+  } catch (err) {
+    console.error('Error loading existing resume:', err)
   }
 }
 
@@ -230,146 +289,32 @@ onMounted(() => { fetchExistingResume() })
 </script>
 
 <style scoped>
-.page-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.6rem;
-  color: var(--gc-dark);
-  margin-bottom: 0.25rem;
-}
+.page-title { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--gc-dark); margin-bottom: 0.25rem; }
+.page-sub { font-size: 0.82rem; color: var(--gc-muted); }
+.btn-sm { background: var(--gc-green); color: #fff; padding: 0.35rem 1rem; border-radius: 20px; border: none; font-size: 0.78rem; cursor: pointer; }
+.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline { background: transparent; color: var(--gc-green); border: 1px solid var(--gc-green); padding: 0.35rem 1rem; border-radius: 20px; font-size: 0.78rem; cursor: pointer; }
+.content { display: grid; grid-template-columns: 1fr 280px; gap: 1rem; }
+.card { background: #fff; border-radius: 10px; border: 0.5px solid #C0DD97; padding: 1rem 1.1rem; margin-bottom: 0.85rem; }
+.card-title { font-size: 0.78rem; font-weight: 500; color: var(--gc-dark); margin-bottom: 0.75rem; }
+.form-input { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; }
+.form-input:focus { border-color: var(--gc-green); }
+.upload-status { margin-top: 0.75rem; font-size: 0.75rem; padding: 0.5rem; border-radius: 8px; }
+.status-success { background: var(--gc-green-light); color: var(--gc-green); }
+.status-error { background: #FEF0F0; color: #B03030; }
 
-.page-sub {
-  font-size: 0.82rem;
-  color: var(--gc-muted);
-}
+/* Step indicator */
+.upload-steps { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.step { font-size: 0.72rem; color: #B4B2A9; padding: 0.25rem 0; transition: color 0.2s; }
+.step.active { color: var(--gc-green); font-weight: 500; }
+.step.done { color: #97C459; }
 
-.btn-sm {
-  background: var(--gc-green);
-  color: #fff;
-  padding: 0.35rem 1rem;
-  border-radius: 20px;
-  border: none;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.btn-sm:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-outline {
-  background: transparent;
-  color: var(--gc-green);
-  border: 1px solid var(--gc-green);
-  padding: 0.35rem 1rem;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.content {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 1rem;
-}
-
-.card {
-  background: #fff;
-  border-radius: 10px;
-  border: 0.5px solid #C0DD97;
-  padding: 1rem 1.1rem;
-  margin-bottom: 0.85rem;
-}
-
-.card-title {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--gc-dark);
-  margin-bottom: 0.75rem;
-}
-
-.form-input {
-  width: 100%;
-  border: 0.5px solid #C0DD97;
-  border-radius: 8px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.82rem;
-  font-family: 'DM Sans', sans-serif;
-  color: var(--gc-dark);
-  background: #fff;
-  outline: none;
-}
-
-.form-input:focus {
-  border-color: var(--gc-green);
-}
-
-.upload-status {
-  margin-top: 0.75rem;
-  font-size: 0.75rem;
-  padding: 0.5rem;
-  border-radius: 8px;
-}
-
-.status-success {
-  background: var(--gc-green-light);
-  color: var(--gc-green);
-}
-
-.status-error {
-  background: #FEF0F0;
-  color: #B03030;
-}
-
-.skills-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.skill-chip {
-  font-size: 0.75rem;
-  background: var(--gc-green-light);
-  color: var(--gc-green);
-  padding: 4px 12px;
-  border-radius: 20px;
-}
-
-.quant-row {
-  padding: 0.65rem 0;
-  border-bottom: 0.5px solid #EAF3DE;
-  font-size: 0.8rem;
-  color: var(--gc-muted);
-  line-height: 1.6;
-}
-
-.quant-row:last-child {
-  border-bottom: none;
-}
-
-.ai-summary {
-  font-size: 0.82rem;
-  color: var(--gc-muted);
-  line-height: 1.7;
-}
-
-.ai-tip {
-  background: var(--gc-green-light);
-  border-radius: 10px;
-  padding: 0.85rem;
-  margin-bottom: 0.85rem;
-}
-
-.ai-tip-label {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--gc-green);
-  margin-bottom: 0.35rem;
-}
-
-.ai-tip-body {
-  font-size: 0.75rem;
-  color: var(--gc-muted);
-  line-height: 1.6;
-}
+.skills-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.skill-chip { font-size: 0.75rem; background: var(--gc-green-light); color: var(--gc-green); padding: 4px 12px; border-radius: 20px; }
+.quant-row { padding: 0.65rem 0; border-bottom: 0.5px solid #EAF3DE; font-size: 0.8rem; color: var(--gc-muted); line-height: 1.6; }
+.quant-row:last-child { border-bottom: none; }
+.ai-summary { font-size: 0.82rem; color: var(--gc-muted); line-height: 1.7; }
+.ai-tip { background: var(--gc-green-light); border-radius: 10px; padding: 0.85rem; margin-bottom: 0.85rem; }
+.ai-tip-label { font-size: 0.72rem; font-weight: 500; color: var(--gc-green); margin-bottom: 0.35rem; }
+.ai-tip-body { font-size: 0.75rem; color: var(--gc-muted); line-height: 1.6; }
 </style>

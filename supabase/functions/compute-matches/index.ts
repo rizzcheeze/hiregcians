@@ -78,6 +78,11 @@ serve(async (req) => {
   }
 })
 
+uploadStep.value = 5
+console.log('authStore.user.id:', authStore.user.id)
+console.log('authStore.user:', JSON.stringify(authStore.user))
+await computeMatchesForStudent(authStore.user.id:'5843f4ca-e017-462a-9a2e-f2ceb2a98d00')
+
 function calculateMatch(studentSkills: string[], jobSkills: string[]) {
   const normalizedStudent = normalizeSkills(studentSkills)
   const normalizedJob = normalizeSkills(jobSkills)
