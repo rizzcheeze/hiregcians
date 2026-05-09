@@ -29,124 +29,128 @@
 
     <div class="right-panel">
       <div class="auth-box">
-        <div class="auth-tabs">
-          <div class="auth-tab" @click="$router.push('/login')">Log in</div>
-          <div class="auth-tab active">Sign up</div>
+
+        <!-- ── Email sent confirmation screen ── -->
+        <div v-if="emailSent" class="email-sent-box">
+          <div class="email-sent-icon">✉</div>
+          <div class="email-sent-title">Check your email</div>
+          <div class="email-sent-sub">
+            We sent a confirmation link to <strong>{{ signupForm.email }}</strong>.
+            Click it to activate your account and get started.
+          </div>
+          <div class="email-sent-note">Didn't receive it? Check your spam folder.</div>
+          <button class="btn-full" style="margin-top: 1.5rem;" @click="emailSent = false">Back to sign up</button>
         </div>
 
-        <div class="auth-heading">Create account</div>
-
-        <div class="role-selector">
-          <div class="role-card" :class="{ selected: signupRole === 'student' }" @click="signupRole = 'student'; showEmployerExtras = false">
-            <div class="role-title">Student</div>
-            <div class="role-sub">Browse & apply</div>
+        <!-- ── Sign up form ── -->
+        <template v-else>
+          <div class="auth-tabs">
+            <div class="auth-tab" @click="$router.push('/login')">Log in</div>
+            <div class="auth-tab active">Sign up</div>
           </div>
-          <div class="role-card" :class="{ selected: signupRole === 'employer' }" @click="signupRole = 'employer'; showEmployerExtras = true">
-            <div class="role-title">Employer</div>
-            <div class="role-sub">Post & hire</div>
-          </div>
-        </div>
 
-        <div class="form-row">
-          <div>
-            <label class="form-label">First name</label>
-            <input class="form-input" v-model="signupForm.first_name" placeholder="First name" />
-          </div>
-          <div>
-            <label class="form-label">Last name</label>
-            <input class="form-input" v-model="signupForm.last_name" placeholder="Last name" />
-          </div>
-        </div>
+          <div class="auth-heading">Create account</div>
 
-        <label class="form-label">Email</label>
-        <input class="form-input" v-model="signupForm.email" type="email" placeholder="yourname@example.com" />
+          <div class="role-selector">
+            <div class="role-card" :class="{ selected: signupRole === 'student' }" @click="signupRole = 'student'; showEmployerExtras = false">
+              <div class="role-title">Student</div>
+              <div class="role-sub">Browse & apply</div>
+            </div>
+            <div class="role-card" :class="{ selected: signupRole === 'employer' }" @click="signupRole = 'employer'; showEmployerExtras = true">
+              <div class="role-title">Employer</div>
+              <div class="role-sub">Post & hire</div>
+            </div>
+          </div>
 
-        <!-- Student Extras -->
-        <div v-if="signupRole === 'student'" class="signup-extras visible">
           <div class="form-row">
             <div>
-              <label class="form-label">Program</label>
-              <select class="form-select" v-model="signupForm.program">
-                <option value="">Select program</option>
-                <option value="BSCS">BSCS - Computer Science</option>
-                <option value="BSIT">BSIT - Information Technology</option>
-                <option value="BSIS">BSIS - Information Systems</option>
-              </select>
+              <label class="form-label">First name</label>
+              <input class="form-input" v-model="signupForm.first_name" placeholder="First name" />
             </div>
             <div>
-              <label class="form-label">Year level</label>
-              <select class="form-select" v-model="signupForm.year_level">
-                <option value="">Select year</option>
-                <option value="1st Year">1st Year</option>
-                <option value="2nd Year">2nd Year</option>
-                <option value="3rd Year">3rd Year</option>
-                <option value="4th Year">4th Year</option>
-              </select>
+              <label class="form-label">Last name</label>
+              <input class="form-input" v-model="signupForm.last_name" placeholder="Last name" />
             </div>
           </div>
-        </div>
 
-        <!-- Employer Extras -->
-        <div v-if="signupRole === 'employer'" class="signup-extras visible">
-          <label class="form-label">Company name</label>
-          <input class="form-input" v-model="signupForm.company_name" placeholder="Your company name" />
-        </div>
+          <label class="form-label">Email</label>
+          <input class="form-input" v-model="signupForm.email" type="email" placeholder="yourname@example.com" />
 
-        <label class="form-label">Password</label>
-        <div class="password-wrapper">
-          <input
-            class="form-input"
-            v-model="signupForm.password"
-            :type="showPassword ? 'text' : 'password'"
-            placeholder="At least 8 characters"
-            style="margin-bottom: 0.5rem; padding-right: 2.5rem;"
-          />
-          <span class="pw-toggle" @click="showPassword = !showPassword">
-            {{ showPassword ? 'Hide' : 'Show' }}
-          </span>
-        </div>
-
-        <!-- Password strength bar -->
-        <div v-if="signupForm.password.length > 0" class="strength-wrapper">
-          <div class="strength-bar">
-            <div
-              class="strength-fill"
-              :style="{ width: strengthPercent + '%', background: strengthColor }"
-            ></div>
+          <!-- Student Extras -->
+          <div v-if="signupRole === 'student'" class="signup-extras visible">
+            <div class="form-row">
+              <div>
+                <label class="form-label">Program</label>
+                <select class="form-select" v-model="signupForm.program">
+                  <option value="">Select program</option>
+                  <option value="BSCS">BSCS - Computer Science</option>
+                  <option value="BSIT">BSIT - Information Technology</option>
+                  <option value="BSIS">BSIS - Information Systems</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Year level</label>
+                <select class="form-select" v-model="signupForm.year_level">
+                  <option value="">Select year</option>
+                  <option value="1st Year">1st Year</option>
+                  <option value="2nd Year">2nd Year</option>
+                  <option value="3rd Year">3rd Year</option>
+                  <option value="4th Year">4th Year</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <div class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</div>
-        </div>
 
-        <!-- Password requirements checklist -->
-        <div v-if="signupForm.password.length > 0" class="pw-checklist">
-          <div class="pw-check" :class="{ met: checks.length }">
-            {{ checks.length ? '✓' : '✗' }} At least 8 characters
+          <!-- Employer Extras -->
+          <div v-if="signupRole === 'employer'" class="signup-extras visible">
+            <label class="form-label">Company name</label>
+            <input class="form-input" v-model="signupForm.company_name" placeholder="Your company name" />
           </div>
-          <div class="pw-check" :class="{ met: checks.uppercase }">
-            {{ checks.uppercase ? '✓' : '✗' }} One uppercase letter
-          </div>
-          <div class="pw-check" :class="{ met: checks.lowercase }">
-            {{ checks.lowercase ? '✓' : '✗' }} One lowercase letter
-          </div>
-          <div class="pw-check" :class="{ met: checks.number }">
-            {{ checks.number ? '✓' : '✗' }} One number
-          </div>
-          <div class="pw-check" :class="{ met: checks.special }">
-            {{ checks.special ? '✓' : '✗' }} One special character (!@#$%^&*)
-          </div>
-        </div>
 
-        <p v-if="signupError" class="error-message">{{ signupError }}</p>
+          <label class="form-label">Password</label>
+          <div class="password-wrapper">
+            <input
+              class="form-input"
+              v-model="signupForm.password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="At least 8 characters"
+              style="margin-bottom: 0.5rem; padding-right: 2.5rem;"
+            />
+            <span class="pw-toggle" @click="showPassword = !showPassword">
+              {{ showPassword ? 'Hide' : 'Show' }}
+            </span>
+          </div>
 
-        <button class="btn-full" @click="handleSignup" :disabled="signupLoading">
-          {{ signupLoading ? 'Creating account...' : 'Create my account' }}
-        </button>
+          <!-- Password strength bar -->
+          <div v-if="signupForm.password.length > 0" class="strength-wrapper">
+            <div class="strength-bar">
+              <div class="strength-fill" :style="{ width: strengthPercent + '%', background: strengthColor }"></div>
+            </div>
+            <div class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</div>
+          </div>
 
-        <div class="terms">
-          By continuing, you agree to our
-          <a href="/terms" target="_blank">Terms of Use</a> and
-          <a href="/privacy" target="_blank">Privacy Policy</a>.
-        </div>
+          <!-- Password requirements checklist -->
+          <div v-if="signupForm.password.length > 0" class="pw-checklist">
+            <div class="pw-check" :class="{ met: checks.length }">{{ checks.length ? '✓' : '✗' }} At least 8 characters</div>
+            <div class="pw-check" :class="{ met: checks.uppercase }">{{ checks.uppercase ? '✓' : '✗' }} One uppercase letter</div>
+            <div class="pw-check" :class="{ met: checks.lowercase }">{{ checks.lowercase ? '✓' : '✗' }} One lowercase letter</div>
+            <div class="pw-check" :class="{ met: checks.number }">{{ checks.number ? '✓' : '✗' }} One number</div>
+            <div class="pw-check" :class="{ met: checks.special }">{{ checks.special ? '✓' : '✗' }} One special character (!@#$%^&*)</div>
+          </div>
+
+          <p v-if="signupError" class="error-message">{{ signupError }}</p>
+
+          <button class="btn-full" @click="handleSignup" :disabled="signupLoading">
+            {{ signupLoading ? 'Creating account...' : 'Create my account' }}
+          </button>
+
+          <div class="terms">
+            By continuing, you agree to our
+            <a href="/terms" target="_blank">Terms of Use</a> and
+            <a href="/privacy" target="_blank">Privacy Policy</a>.
+          </div>
+        </template>
+
       </div>
     </div>
   </div>
@@ -164,6 +168,7 @@ const authStore = useAuthStore()
 const signupRole = ref('student')
 const showEmployerExtras = ref(false)
 const showPassword = ref(false)
+const emailSent = ref(false)
 const signupForm = ref({
   first_name: '',
   last_name: '',
@@ -176,7 +181,6 @@ const signupForm = ref({
 const signupLoading = ref(false)
 const signupError = ref('')
 
-// Password requirement checks
 const checks = computed(() => ({
   length:    signupForm.value.password.length >= 8,
   uppercase: /[A-Z]/.test(signupForm.value.password),
@@ -185,18 +189,15 @@ const checks = computed(() => ({
   special:   /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(signupForm.value.password),
 }))
 
-const strengthScore = computed(() => Object.values(checks.value).filter(Boolean).length)
-
+const strengthScore   = computed(() => Object.values(checks.value).filter(Boolean).length)
 const strengthPercent = computed(() => (strengthScore.value / 5) * 100)
-
-const strengthColor = computed(() => {
+const strengthColor   = computed(() => {
   if (strengthScore.value <= 1) return '#E53535'
   if (strengthScore.value === 2) return '#E57F35'
   if (strengthScore.value === 3) return '#E5C535'
   if (strengthScore.value === 4) return '#7DB84A'
   return '#3B6D11'
 })
-
 const strengthLabel = computed(() => {
   if (strengthScore.value <= 1) return 'Very weak'
   if (strengthScore.value === 2) return 'Weak'
@@ -204,15 +205,12 @@ const strengthLabel = computed(() => {
   if (strengthScore.value === 4) return 'Good'
   return 'Strong'
 })
-
 const isPasswordValid = computed(() => Object.values(checks.value).every(Boolean))
-
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
 const handleSignup = async () => {
   signupError.value = ''
 
-  // Validate required fields
   if (!signupForm.value.first_name || !signupForm.value.last_name) {
     signupError.value = 'Please enter your full name.'
     return
@@ -221,12 +219,8 @@ const handleSignup = async () => {
     signupError.value = 'Please enter a valid email address.'
     return
   }
-  if (!isPasswordValid.value) {
+  if (!isPasswordValid.value || strengthScore.value < 5) {
     signupError.value = 'Please make sure your password meets all requirements.'
-    return
-  }
-  if (strengthScore.value < 5) {
-    signupError.value = 'Password is too weak. Please use a stronger password.'
     return
   }
 
@@ -240,23 +234,31 @@ const handleSignup = async () => {
       role: signupRole.value
     })
 
-    if (signupRole.value === 'student') {
-      await supabase.from('student_profiles').insert({
-        user_id: authStore.user.id,
-        program: signupForm.value.program,
-        section: signupForm.value.year_level
-      })
-    } else if (signupRole.value === 'employer') {
-      await supabase.from('employer_profiles').insert({
-        user_id: authStore.user.id,
-        company_name: signupForm.value.company_name
-      })
-    }
-
-    if (signupRole.value === 'student') {
-      router.push('/student/dashboard')
+    if (authStore.user?.id) {
+      // Email confirmation is OFF — session exists immediately
+      if (signupRole.value === 'student') {
+        await supabase.from('student_profiles').insert({
+          user_id: authStore.user.id,
+          program: signupForm.value.program,
+          section: signupForm.value.year_level
+        })
+      } else if (signupRole.value === 'employer') {
+        await supabase.from('employer_profiles').insert({
+          user_id: authStore.user.id,
+          company_name: signupForm.value.company_name
+        })
+      }
+      router.push(signupRole.value === 'student' ? '/student/dashboard' : '/employer/dashboard')
     } else {
-      router.push('/employer/dashboard')
+      // Email confirmation is ON — no session yet, show confirmation screen
+      // Store signup data so we can create the profile after confirmation
+      sessionStorage.setItem('pending_signup', JSON.stringify({
+        role: signupRole.value,
+        program: signupForm.value.program,
+        year_level: signupForm.value.year_level,
+        company_name: signupForm.value.company_name
+      }))
+      emailSent.value = true
     }
   } catch (err) {
     signupError.value = err.message || 'Failed to create account'
@@ -278,7 +280,6 @@ const handleSignup = async () => {
   grid-template-columns: 1fr 1fr;
 }
 
-/* Left Panel */
 .left-panel {
   background: var(--gc-dark);
   padding: 3rem;
@@ -311,9 +312,15 @@ const handleSignup = async () => {
 .lp-card-sub { font-size: 0.72rem; color: #97C459; }
 .lp-pct { font-size: 0.72rem; font-weight: 500; background: var(--gc-green); color: #C0DD97; padding: 2px 8px; border-radius: 20px; margin-left: auto; }
 
-/* Right Panel */
 .right-panel { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .auth-box { width: 100%; max-width: 400px; }
+
+/* Email sent screen */
+.email-sent-box { text-align: center; padding: 1rem 0; }
+.email-sent-icon { font-size: 3rem; margin-bottom: 1rem; }
+.email-sent-title { font-family: 'DM Serif Display', serif; font-size: 1.8rem; color: var(--gc-dark); margin-bottom: 0.75rem; }
+.email-sent-sub { font-size: 0.88rem; color: var(--gc-muted); line-height: 1.7; margin-bottom: 0.5rem; }
+.email-sent-note { font-size: 0.75rem; color: #B4B2A9; margin-top: 0.5rem; }
 
 .auth-tabs { display: flex; border-bottom: 0.5px solid #C0DD97; margin-bottom: 1.75rem; }
 .auth-tab { font-size: 0.88rem; color: var(--gc-muted); padding: 0.6rem 1.25rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
@@ -324,7 +331,6 @@ const handleSignup = async () => {
 .role-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 1.5rem; }
 .role-card { border: 1.5px solid #C0DD97; border-radius: 10px; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.15s; background: #fff; }
 .role-card.selected { border-color: var(--gc-green); background: var(--gc-green-light); }
-.role-icon { font-size: 1.4rem; margin-bottom: 0.4rem; }
 .role-title { font-size: 0.82rem; font-weight: 500; color: var(--gc-dark); }
 .role-sub { font-size: 0.7rem; color: var(--gc-muted); margin-top: 0.15rem; }
 
@@ -337,17 +343,14 @@ const handleSignup = async () => {
 .signup-extras { display: none; }
 .signup-extras.visible { display: block; }
 
-/* Password toggle wrapper */
 .password-wrapper { position: relative; }
-.pw-toggle { position: absolute; right: 0.75rem; top: 0.6rem; cursor: pointer; font-size: 0.9rem; user-select: none; }
+.pw-toggle { position: absolute; right: 0.75rem; top: 0.6rem; cursor: pointer; font-size: 0.75rem; color: var(--gc-muted); user-select: none; }
 
-/* Strength bar */
 .strength-wrapper { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
 .strength-bar { flex: 1; height: 6px; background: #EAF3DE; border-radius: 4px; overflow: hidden; }
 .strength-fill { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
 .strength-label { font-size: 0.72rem; font-weight: 500; min-width: 60px; }
 
-/* Checklist */
 .pw-checklist { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; }
 .pw-check { font-size: 0.72rem; color: #B4B2A9; transition: color 0.2s; }
 .pw-check.met { color: var(--gc-green); }
