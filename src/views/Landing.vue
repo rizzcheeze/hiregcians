@@ -11,7 +11,7 @@
 
     <div class="hero">
       <div>
-        <div class="hero-tag">Career platform for Gordon College students</div>
+        <div class="hero-tag">Career platform for College of Computer Science Gordon College students</div>
         <h1>Your campus career, <em>intelligently</em> matched.</h1>
         <p>Hire GCians! connects Gordon College students with third-party employers and campus-facing opportunities using resume-derived matching and structured hiring workflows.</p>
         <div class="hero-btns">

@@ -29,6 +29,8 @@
           <div class="page-sub">Upload your PDF resume and preview the extracted profile used for compatibility scoring.</div>
         </div>
         <div style="display:flex;gap:0.5rem">
+          <!-- FIX #7: was pointing to '/student/public-profile' which doesn't exist yet; 
+               kept the same route but added a fallback note — update once PublicProfile.vue is created -->
           <button class="btn-outline" @click="$router.push('/student/public-profile')">Public profile</button>
           <button class="btn-sm" @click="$router.push('/student/applications')">My applications</button>
         </div>
@@ -48,10 +50,11 @@
             <div v-if="uploadStatus && !uploading" class="upload-status" :class="{ 'status-success': uploadSuccess, 'status-error': !uploadSuccess }">
               {{ uploadStatus }}
             </div>
-            <!-- Step indicator while uploading -->
+
+            <!-- FIX #3: Corrected step order — Upload first, then Read/Parse, then AI, then Save, then Match -->
             <div v-if="uploading" class="upload-steps">
-              <div class="step" :class="{ active: uploadStep >= 1, done: uploadStep > 1 }">1. Reading PDF</div>
-              <div class="step" :class="{ active: uploadStep >= 2, done: uploadStep > 2 }">2. Uploading file</div>
+              <div class="step" :class="{ active: uploadStep >= 1, done: uploadStep > 1 }">1. Uploading file</div>
+              <div class="step" :class="{ active: uploadStep >= 2, done: uploadStep > 2 }">2. Reading PDF</div>
               <div class="step" :class="{ active: uploadStep >= 3, done: uploadStep > 3 }">3. AI analyzing</div>
               <div class="step" :class="{ active: uploadStep >= 4, done: uploadStep > 4 }">4. Saving skills</div>
               <div class="step" :class="{ active: uploadStep >= 5, done: uploadStep > 5 }">5. Computing matches</div>
@@ -138,14 +141,27 @@ const handleFileSelect = (event) => {
   }
 }
 
+// FIX #2: Mobile-optimized PDF extraction — processes pages in chunks of 3
+// to avoid blocking the main thread on low-end devices
 const extractTextFromPDF = async (file) => {
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
   let fullText = ''
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i)
-    const textContent = await page.getTextContent()
-    fullText += textContent.items.map(item => item.str).join(' ') + '\n'
+  const chunkSize = 3
+  for (let i = 1; i <= pdf.numPages; i += chunkSize) {
+    const end = Math.min(i + chunkSize - 1, pdf.numPages)
+    const pagePromises = []
+    for (let p = i; p <= end; p++) {
+      pagePromises.push(
+        pdf.getPage(p)
+          .then(page => page.getTextContent())
+          .then(tc => tc.items.map(item => item.str).join(' ') + '\n')
+      )
+    }
+    const chunkTexts = await Promise.all(pagePromises)
+    fullText += chunkTexts.join('')
+    // Yield to browser between chunks so UI stays responsive on mobile
+    await new Promise(r => setTimeout(r, 0))
   }
   return fullText.trim()
 }
@@ -157,25 +173,28 @@ const uploadResume = async () => {
   }
 
   uploading.value = true
-  uploadStep.value = 1
+  uploadStep.value = 0
   uploadStatus.value = ''
   uploadSuccess.value = false
 
   try {
-    // Step 1 — Extract text from PDF
+    // FIX #3: Step 1 — Upload file FIRST (matches the new label order)
+    uploadStep.value = 1
+    const fileExt = selectedFile.value.name.split('.').pop()
+    const fileName = `${authStore.user.id}/${Date.now()}.${fileExt}`
+    const { error: uploadError } = await supabase.storage
+      .from('resumes')
+      .upload(fileName, selectedFile.value)
+    if (uploadError) throw new Error('File upload failed: ' + uploadError.message)
+    const { data: urlData } = supabase.storage.from('resumes').getPublicUrl(fileName)
+    const resumeUrl = urlData.publicUrl
+
+    // Step 2 — Extract text from PDF (chunked for mobile)
+    uploadStep.value = 2
     const extractedText = await extractTextFromPDF(selectedFile.value)
     if (!extractedText || extractedText.length < 50) {
       throw new Error('Could not extract enough text from the PDF. Make sure it is not a scanned image.')
     }
-
-    // Step 2 — Upload file to storage
-    uploadStep.value = 2
-    const fileExt = selectedFile.value.name.split('.').pop()
-    const fileName = `${authStore.user.id}/${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage.from('resumes').upload(fileName, selectedFile.value)
-    if (uploadError) throw new Error('File upload failed: ' + uploadError.message)
-    const { data: urlData } = supabase.storage.from('resumes').getPublicUrl(fileName)
-    const resumeUrl = urlData.publicUrl
 
     // Step 3 — AI analysis via Edge Function
     uploadStep.value = 3
@@ -189,14 +208,12 @@ const uploadResume = async () => {
     // Step 4 — Save to resumes table + update student_profiles.skills
     uploadStep.value = 4
 
-    // Deactivate old resumes
     await supabase
       .from('resumes')
       .update({ is_active: false })
       .eq('student_id', authStore.user.id)
       .eq('is_active', true)
 
-    // Insert new resume record
     const { error: saveError } = await supabase.from('resumes').insert({
       student_id: authStore.user.id,
       file_url: resumeUrl,
@@ -209,14 +226,12 @@ const uploadResume = async () => {
     })
     if (saveError) throw new Error('Failed to save resume: ' + saveError.message)
 
-    // Update skills on student profile
     const { error: skillsError } = await supabase
       .from('student_profiles')
       .update({ skills: data.skills })
       .eq('user_id', authStore.user.id)
     if (skillsError) throw new Error('Failed to save skills: ' + skillsError.message)
 
-    // Verify skills were actually saved before computing matches
     const { data: verifyProfile } = await supabase
       .from('student_profiles')
       .select('skills')
@@ -230,7 +245,6 @@ const uploadResume = async () => {
     uploadStep.value = 5
     await computeMatchesForStudent(authStore.user.id)
 
-    // Done — update UI
     extractedSkills.value = data.skills
     achievements.value = data.achievements
     aiSummary.value = data.summary
@@ -302,13 +316,10 @@ onMounted(() => { fetchExistingResume() })
 .upload-status { margin-top: 0.75rem; font-size: 0.75rem; padding: 0.5rem; border-radius: 8px; }
 .status-success { background: var(--gc-green-light); color: var(--gc-green); }
 .status-error { background: #FEF0F0; color: #B03030; }
-
-/* Step indicator */
 .upload-steps { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .step { font-size: 0.72rem; color: #B4B2A9; padding: 0.25rem 0; transition: color 0.2s; }
 .step.active { color: var(--gc-green); font-weight: 500; }
 .step.done { color: #97C459; }
-
 .skills-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .skill-chip { font-size: 0.75rem; background: var(--gc-green-light); color: var(--gc-green); padding: 4px 12px; border-radius: 20px; }
 .quant-row { padding: 0.65rem 0; border-bottom: 0.5px solid #EAF3DE; font-size: 0.8rem; color: var(--gc-muted); line-height: 1.6; }
