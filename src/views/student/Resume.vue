@@ -239,14 +239,12 @@ const uploadResume = async () => {
         await supabase.functions.invoke('embed-resume', {
           body: {
             resumeId: lastResumeId,
-            text: extractedText,
-            studentId: authStore.user.id
+            text: extractedText
           }
         })
         console.log('Embedding generated for resume')
       } catch (embedError) {
         console.error('Failed to generate embedding:', embedError)
-        // Continue anyway - embedding can be retried later
       }
     }
 

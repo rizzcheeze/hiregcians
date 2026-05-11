@@ -11,9 +11,11 @@ serve(async (req) => {
   }
 
   try {
-    const { resumeId, text, studentId } = await req.json()
+    const { resumeId, text } = await req.json()  // Removed studentId - not needed
     
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('EMBEDDING_SERVICE_KEY')
     
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY not configured')
@@ -23,65 +25,64 @@ serve(async (req) => {
       throw new Error('No text provided')
     }
 
-    // Generate embedding using Gemini (same as your original)
+    // Generate embedding using Gemini
     const embedding = await getGeminiEmbedding(text, GEMINI_API_KEY)
     
-    // NEW: Save to resume_embeddings table
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('EMBEDDING_SERVICE_KEY')
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.warn('Missing Supabase credentials - embedding not saved')
+      return new Response(
+        JSON.stringify({ embedding, warning: 'Embedding generated but not saved' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     
-    if (supabaseUrl && supabaseServiceKey) {
-      // Check if embedding already exists
-      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/resume_embeddings?resume_id=eq.${resumeId}&select=id`, {
-        method: 'GET',
+    // Check if embedding already exists
+    const checkResponse = await fetch(`${supabaseUrl}/rest/v1/resume_embeddings?resume_id=eq.${resumeId}&select=id`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseServiceKey,
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      }
+    })
+    
+    const existing = await checkResponse.json()
+    
+    if (existing && existing.length > 0) {
+      // Update existing embedding
+      await fetch(`${supabaseUrl}/rest/v1/resume_embeddings?resume_id=eq.${resumeId}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'apikey': supabaseServiceKey,
           'Authorization': `Bearer ${supabaseServiceKey}`,
-        }
+        },
+        body: JSON.stringify({
+          embedding: embedding,
+          updated_at: new Date().toISOString()
+        })
       })
-      
-      const existing = await checkResponse.json()
-      
-      if (existing && existing.length > 0) {
-        // Update existing embedding
-        await fetch(`${supabaseUrl}/rest/v1/resume_embeddings?resume_id=eq.${resumeId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            embedding: embedding,
-            updated_at: new Date().toISOString()
-          })
-        })
-        console.log('Updated embedding for resume:', resumeId)
-      } else {
-        // Insert new embedding
-        await fetch(`${supabaseUrl}/rest/v1/resume_embeddings`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            resume_id: resumeId,
-            student_id: studentId,
-            embedding: embedding,
-            created_at: new Date().toISOString()
-          })
-        })
-        console.log('Inserted embedding for resume:', resumeId)
-      }
+      console.log('Updated embedding for resume:', resumeId)
     } else {
-      console.warn('Missing Supabase credentials - embedding not saved')
+      // Insert new embedding (no student_id column)
+      await fetch(`${supabaseUrl}/rest/v1/resume_embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          resume_id: resumeId,
+          embedding: embedding,
+          created_at: new Date().toISOString()
+        })
+      })
+      console.log('Inserted embedding for resume:', resumeId)
     }
     
     return new Response(
-      JSON.stringify({ embedding, success: true }),
+      JSON.stringify({ success: true, embeddingLength: embedding.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
