@@ -3,10 +3,7 @@
     <aside class="sidebar">
       <div class="s-logo">Hire <span>GCians!</span></div>
       <div class="s-user">
-        <div class="s-avatar">
-          <img v-if="avatarUrl" :src="avatarUrl" class="s-avatar-img" />
-          <span v-else>{{ initials }}</span>
-        </div>
+        <div class="s-avatar">{{ initials }}</div>
         <div>
           <div class="s-name">{{ firstName }} {{ lastName }}</div>
           <div class="s-prog">{{ form.program }} {{ form.section }}</div>
@@ -39,29 +36,7 @@
 
       <div class="profile-hero">
         <div class="ph-inner">
-          <!-- Avatar with upload -->
-          <div class="avatar-wrap">
-            <div class="avatar-big">
-              <img v-if="avatarUrl" :src="avatarUrl" class="avatar-img" />
-              <span v-else>{{ initials }}</span>
-            </div>
-            <button
-              class="avatar-upload-btn"
-              @click="avatarInput.click()"
-              :disabled="avatarUploading"
-              :title="avatarUploading ? 'Uploading...' : 'Upload photo'"
-            >
-              {{ avatarUploading ? '⏳' : '📷' }}
-            </button>
-            <input
-              ref="avatarInput"
-              type="file"
-              accept="image/*"
-              style="display:none"
-              @change="handleAvatarUpload"
-            />
-          </div>
-
+          <div class="avatar-big">{{ initials }}</div>
           <div class="ph-info">
             <h2>{{ firstName }} {{ lastName }}</h2>
             <p>{{ form.program }} {{ form.section }} · Gordon College, Olongapo City</p>
@@ -70,9 +45,8 @@
               <span v-if="skills.length === 0" class="ph-tag neutral">No skills uploaded yet</span>
             </div>
           </div>
-
-          <div v-if="avatarStatus" class="avatar-status" :class="{ error: avatarError }">
-            {{ avatarStatus }}
+          <div class="ph-actions">
+            <button class="btn-outline" style="font-size:0.72rem">📷 Upload photo</button>
           </div>
         </div>
       </div>
@@ -82,8 +56,8 @@
         <div>
           <div class="card">
             <div class="card-title">
-              AI-extracted skills
-              <span class="from-resume-label">From resume PDF</span>
+              AI-extracted skills 
+              <span class="edit-link">From resume PDF</span>
             </div>
             <div class="skills-grid">
               <span v-for="skill in skills" :key="skill" class="skill-chip">{{ skill }}</span>
@@ -93,7 +67,7 @@
 
           <div class="card">
             <div class="card-title">
-              Experience &amp; involvement
+              Experience & involvement 
               <span class="edit-link" @click="addExperience">+ Add</span>
             </div>
             <div v-if="experiences.length === 0" class="exp-row" style="color: var(--gc-muted);">
@@ -124,7 +98,7 @@
 
           <div class="card">
             <div class="card-title">
-              About me
+              About me 
               <span class="edit-link" @click="editAbout = !editAbout">Edit</span>
             </div>
             <div v-if="!editAbout" class="exp-desc" style="font-size:0.82rem;">
@@ -163,18 +137,17 @@
             <div class="checklist-row">
               <span :class="form.resume_url ? 'check-done' : 'check-todo'">○</span> Resume uploaded
             </div>
-            <div class="checklist-row">
-              <span :class="avatarUrl ? 'check-done' : 'check-todo'">○</span> Profile photo added
-            </div>
           </div>
 
           <div class="ai-tip">
             <div class="ai-tip-label">AI engine suggests</div>
-            <div class="ai-tip-body">{{ aiSuggestion }}</div>
+            <div class="ai-tip-body">
+              {{ aiSuggestion }}
+            </div>
           </div>
 
           <div class="card">
-            <div class="card-title">Program &amp; Section</div>
+            <div class="card-title">Program & Section</div>
             <label class="form-label">Program</label>
             <select v-model="form.program" class="form-select">
               <option value="">Select program</option>
@@ -183,7 +156,7 @@
               <option value="BSIS">BSIS - Information Systems</option>
               <option value="Other">Other</option>
             </select>
-
+            
             <label class="form-label">Section / Year Level</label>
             <select v-model="form.section" class="form-select">
               <option value="">Select section</option>
@@ -214,13 +187,6 @@ const editAbout = ref(false)
 const skills = ref([])
 const experiences = ref([])
 
-// Avatar
-const avatarUrl = ref(null)
-const avatarUploading = ref(false)
-const avatarStatus = ref('')
-const avatarError = ref(false)
-const avatarInput = ref(null)
-
 const form = ref({
   program: '',
   section: '',
@@ -228,28 +194,32 @@ const form = ref({
   resume_url: null
 })
 
-const firstName = computed(() => authStore.profile?.first_name || '')
-const lastName  = computed(() => authStore.profile?.last_name  || '')
-const initials  = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
+const firstName = computed(() => authStore.profile?.first_name || 'Allyana')
+const lastName = computed(() => authStore.profile?.last_name || 'Espiridion')
+const initials = computed(() => (firstName.value.charAt(0) || 'A') + (lastName.value.charAt(0) || 'E'))
 
 const completenessPercent = computed(() => {
   let score = 0
   if (firstName.value && lastName.value) score += 15
-  if (form.value.program)                score += 15
-  if (form.value.section)                score += 10
-  if (skills.value.length > 0)           score += 20
-  if (experiences.value.length > 0)      score += 20
-  if (form.value.about)                  score += 10
-  if (avatarUrl.value)                   score += 10
+  if (form.value.program) score += 15
+  if (form.value.section) score += 15
+  if (skills.value.length > 0) score += 20
+  if (experiences.value.length > 0) score += 20
+  if (form.value.about) score += 15
   return Math.min(score, 100)
 })
 
 const aiSuggestion = computed(() => {
-  if (!avatarUrl.value)           return 'Add a profile photo — students with photos get noticed more by employers.'
-  if (skills.value.length === 0)  return 'Upload your resume to get AI-powered skill extraction. This will help employers find you.'
-  if (experiences.value.length === 0) return 'Add your experience and involvement to showcase what you\'ve accomplished.'
-  if (completenessPercent.value < 70) return 'Your profile looks good! Add more details to increase your match scores.'
-  return 'Your profile is complete! You\'re ready to get matched with great opportunities.'
+  if (skills.value.length === 0) {
+    return "Upload your resume to get AI-powered skill extraction. This will help employers find you based on your actual abilities."
+  }
+  if (experiences.value.length === 0) {
+    return "Add your experience and involvement to showcase what you've accomplished. Employers love seeing real-world projects!"
+  }
+  if (completenessPercent.value < 70) {
+    return "Your profile looks good! Add more details to increase your match scores with potential employers."
+  }
+  return "Your profile is complete! You're ready to get matched with great opportunities."
 })
 
 const handleLogout = async () => {
@@ -257,63 +227,6 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
-// ── Avatar upload ──────────────────────────────────────────────
-const handleAvatarUpload = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
-
-  if (!file.type.startsWith('image/')) {
-    avatarError.value = true
-    avatarStatus.value = 'Please select an image file (JPG, PNG, etc.)'
-    return
-  }
-  if (file.size > 2 * 1024 * 1024) {
-    avatarError.value = true
-    avatarStatus.value = 'Image must be under 2MB'
-    return
-  }
-
-  avatarUploading.value = true
-  avatarStatus.value = ''
-  avatarError.value = false
-
-  try {
-    const ext  = file.name.split('.').pop()
-    const path = `${authStore.user.id}/avatar.${ext}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(path, file, { upsert: true })
-    if (uploadError) throw uploadError
-
-    const { data: urlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(path)
-
-    // cache-bust so the browser shows the new image immediately
-    avatarUrl.value = urlData.publicUrl + '?t=' + Date.now()
-
-    const { error: dbError } = await supabase
-      .from('student_profiles')
-      .update({ avatar_url: urlData.publicUrl })
-      .eq('user_id', authStore.user.id)
-    if (dbError) throw dbError
-
-    avatarStatus.value = 'Photo updated!'
-    avatarError.value  = false
-    setTimeout(() => { avatarStatus.value = '' }, 3000)
-  } catch (err) {
-    console.error('Avatar upload failed:', err)
-    avatarError.value  = true
-    avatarStatus.value = 'Upload failed: ' + err.message
-  } finally {
-    avatarUploading.value = false
-    // reset input so same file can be re-selected
-    if (avatarInput.value) avatarInput.value.value = ''
-  }
-}
-
-// ── Profile save ───────────────────────────────────────────────
 const saveProfile = async () => {
   saving.value = true
   try {
@@ -322,14 +235,15 @@ const saveProfile = async () => {
       .update({
         program: form.value.program,
         section: form.value.section,
-        about:   form.value.about
+        about: form.value.about
       })
       .eq('user_id', authStore.user.id)
+    
     if (error) throw error
     alert('Profile saved successfully!')
   } catch (error) {
     console.error('Error saving profile:', error)
-    alert('Failed to save profile: ' + error.message)
+    alert('Failed to save profile')
   } finally {
     saving.value = false
   }
@@ -340,7 +254,7 @@ const saveAbout = async () => {
   await saveProfile()
 }
 
-// ── Experience ─────────────────────────────────────────────────
+// Experience functions
 const addExperience = () => {
   experiences.value.push({
     id: Date.now(),
@@ -385,17 +299,21 @@ const removeExperience = (index) => {
 const saveExperiences = async () => {
   try {
     const experiencesToSave = experiences.value.map(({ editing, id, ...rest }) => rest)
+    
     const { error } = await supabase
       .from('student_profiles')
-      .update({ experience: experiencesToSave })
+      .update({
+        experience: experiencesToSave
+      })
       .eq('user_id', authStore.user.id)
+    
     if (error) throw error
+    console.log('Experiences saved successfully')
   } catch (error) {
     console.error('Error saving experiences:', error)
   }
 }
 
-// ── Fetch ──────────────────────────────────────────────────────
 const fetchProfile = async () => {
   loading.value = true
   try {
@@ -404,30 +322,30 @@ const fetchProfile = async () => {
       .select('*')
       .eq('user_id', authStore.user.id)
       .maybeSingle()
-
+    
     if (profileError) throw profileError
-
+    
     if (profile) {
-      form.value.program = profile.program  || ''
-      form.value.section = profile.section  || ''
-      form.value.about   = profile.about    || ''
-      skills.value       = profile.skills   || []
-      avatarUrl.value    = profile.avatar_url || null
-      experiences.value  = (profile.experience || []).map(exp => ({
+      form.value.program = profile.program || ''
+      form.value.section = profile.section || ''
+      form.value.about = profile.about || ''
+      skills.value = profile.skills || []
+      experiences.value = (profile.experience || []).map(exp => ({
         ...exp,
         editing: false,
         id: Date.now() + Math.random()
       }))
     }
-
+    
     const { data: resume } = await supabase
       .from('resumes')
       .select('file_url')
       .eq('student_id', authStore.user.id)
       .eq('is_active', true)
       .maybeSingle()
-
+    
     form.value.resume_url = resume?.file_url || null
+    
   } catch (error) {
     console.error('Error fetching profile:', error)
   } finally {
@@ -435,115 +353,318 @@ const fetchProfile = async () => {
   }
 }
 
-onMounted(() => { fetchProfile() })
+onMounted(() => {
+  fetchProfile()
+})
 </script>
 
 <style scoped>
-.page-title { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--gc-dark); margin-bottom: 0.25rem; }
-.page-sub   { font-size: 0.82rem; color: var(--gc-muted); }
+.page-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.6rem;
+  color: var(--gc-dark);
+  margin-bottom: 0.25rem;
+}
+
+.page-sub {
+  font-size: 0.82rem;
+  color: var(--gc-muted);
+}
 
 .btn-sm {
-  background: var(--gc-green); color: #fff; padding: 0.35rem 1rem;
-  border-radius: 20px; border: none; font-size: 0.78rem; cursor: pointer;
+  background: var(--gc-green);
+  color: #fff;
+  padding: 0.35rem 1rem;
+  border-radius: 20px;
+  border: none;
+  font-size: 0.78rem;
+  cursor: pointer;
 }
-.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .btn-outline {
-  background: transparent; color: var(--gc-green); border: 1px solid var(--gc-green);
-  padding: 0.35rem 1rem; border-radius: 20px; font-size: 0.78rem; cursor: pointer;
+  background: transparent;
+  color: var(--gc-green);
+  border: 1px solid var(--gc-green);
+  padding: 0.35rem 1rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  cursor: pointer;
 }
 
-/* Sidebar avatar */
-.s-avatar { position: relative; overflow: hidden; }
-.s-avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-
-/* Profile hero */
 .profile-hero {
-  background: #fff; border: 0.5px solid #C0DD97;
-  border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem;
+  background: #fff;
+  border: 0.5px solid #C0DD97;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
 }
-.ph-inner { display: flex; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap; }
 
-/* Avatar wrapper */
-.avatar-wrap { position: relative; flex-shrink: 0; }
+.ph-inner {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
 
 .avatar-big {
-  width: 72px; height: 72px; border-radius: 50%;
-  background: var(--gc-green); color: #C0DD97;
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'DM Serif Display', serif; font-size: 1.6rem;
-  overflow: hidden;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--gc-green);
+  color: #C0DD97;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.6rem;
+  flex-shrink: 0;
 }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
-.avatar-upload-btn {
-  position: absolute; bottom: 0; right: 0;
-  background: var(--gc-green); border: 2px solid #fff;
-  border-radius: 50%; width: 26px; height: 26px;
-  font-size: 11px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0; line-height: 1;
-  transition: transform 0.15s;
+.ph-info h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.4rem;
+  color: var(--gc-dark);
 }
-.avatar-upload-btn:hover:not(:disabled) { transform: scale(1.1); }
-.avatar-upload-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.avatar-status {
-  font-size: 0.72rem; color: var(--gc-green);
-  margin-top: 0.25rem; align-self: center;
+.ph-info p {
+  font-size: 0.82rem;
+  color: var(--gc-muted);
+  margin-top: 0.2rem;
 }
-.avatar-status.error { color: #B03030; }
 
-.ph-info h2 { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--gc-dark); }
-.ph-info p  { font-size: 0.82rem; color: var(--gc-muted); margin-top: 0.2rem; }
-.ph-tags    { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.6rem; }
-.ph-tag     { font-size: 0.72rem; background: var(--gc-green-light); color: var(--gc-green); padding: 3px 10px; border-radius: 20px; }
-.ph-tag.neutral { background: #F1EFE8; color: var(--gc-muted); }
+.ph-tags {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
 
-/* Layout */
-.content { display: grid; grid-template-columns: 1fr 280px; gap: 1rem; }
+.ph-tag {
+  font-size: 0.72rem;
+  background: var(--gc-green-light);
+  color: var(--gc-green);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.ph-tag.neutral {
+  background: #F1EFE8;
+  color: var(--gc-muted);
+}
+
+.ph-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1rem;
+}
 
 .card {
-  background: #fff; border-radius: 10px;
-  border: 0.5px solid #C0DD97; padding: 1rem 1.1rem; margin-bottom: 0.85rem;
+  background: #fff;
+  border-radius: 10px;
+  border: 0.5px solid #C0DD97;
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.85rem;
 }
+
 .card-title {
-  font-size: 0.78rem; font-weight: 500; color: var(--gc-dark);
-  margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--gc-dark);
+  margin-bottom: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-/* "From resume PDF" — display only, no click */
-.from-resume-label { font-size: 0.7rem; color: var(--gc-muted); cursor: default; }
+.edit-link {
+  font-size: 0.7rem;
+  color: var(--gc-green-mid);
+  cursor: pointer;
+}
 
-.edit-link { font-size: 0.7rem; color: var(--gc-green-mid); cursor: pointer; }
+.skills-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
 
-.skills-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.skill-chip  { font-size: 0.75rem; background: var(--gc-green-light); color: var(--gc-green); padding: 4px 12px; border-radius: 20px; }
-.skill-chip.neutral { background: #F1EFE8; color: var(--gc-muted); }
+.skill-chip {
+  font-size: 0.75rem;
+  background: var(--gc-green-light);
+  color: var(--gc-green);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
 
-.form-label   { font-size: 0.78rem; font-weight: 500; color: var(--gc-dark); margin-bottom: 0.4rem; display: block; }
-.form-select  { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; margin-bottom: 1rem; }
-.form-textarea { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; resize: vertical; }
-.form-input   { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; }
-.form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--gc-green); }
+.skill-chip.neutral {
+  background: #F1EFE8;
+  color: var(--gc-muted);
+}
 
-.exp-row          { padding: 0.6rem 0; border-bottom: 0.5px solid #EAF3DE; }
-.exp-row:last-child { border-bottom: none; }
-.exp-edit-form    { display: flex; flex-direction: column; gap: 0.5rem; }
-.exp-title        { font-size: 0.85rem; font-weight: 500; color: var(--gc-dark); }
-.exp-sub          { font-size: 0.75rem; color: var(--gc-muted); margin-top: 0.15rem; }
-.exp-desc         { font-size: 0.75rem; color: var(--gc-muted); line-height: 1.6; margin-top: 0.3rem; }
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--gc-dark);
+  margin-bottom: 0.4rem;
+  display: block;
+}
 
-.comp-ring  { text-align: center; padding: 0.5rem 0 0.75rem; }
-.comp-num   { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--gc-green); }
-.comp-sub   { font-size: 0.72rem; color: var(--gc-muted); }
-.comp-bar-bg { background: #EAF3DE; border-radius: 4px; height: 8px; margin: 0.5rem 0; }
-.comp-bar   { background: var(--gc-green); border-radius: 4px; height: 8px; transition: width 0.4s; }
+.form-select {
+  width: 100%;
+  border: 0.5px solid #C0DD97;
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--gc-dark);
+  background: #fff;
+  outline: none;
+  margin-bottom: 1rem;
+}
 
-.checklist-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; padding: 0.25rem 0; color: var(--gc-muted); }
-.check-done    { color: var(--gc-green); font-size: 12px; }
-.check-todo    { color: #D3D1C7; font-size: 12px; }
+.form-textarea {
+  width: 100%;
+  border: 0.5px solid #C0DD97;
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--gc-dark);
+  background: #fff;
+  outline: none;
+  resize: vertical;
+}
 
-.ai-tip       { background: var(--gc-green-light); border-radius: 10px; padding: 0.85rem; margin-bottom: 0.85rem; }
-.ai-tip-label { font-size: 0.72rem; font-weight: 500; color: var(--gc-green); margin-bottom: 0.35rem; }
-.ai-tip-body  { font-size: 0.75rem; color: var(--gc-muted); line-height: 1.6; }
+.form-input {
+  width: 100%;
+  border: 0.5px solid #C0DD97;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--gc-dark);
+  background: #fff;
+  outline: none;
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  border-color: var(--gc-green);
+}
+
+.exp-row {
+  padding: 0.6rem 0;
+  border-bottom: 0.5px solid #EAF3DE;
+}
+
+.exp-row:last-child {
+  border-bottom: none;
+}
+
+.exp-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.exp-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--gc-dark);
+}
+
+.exp-sub {
+  font-size: 0.75rem;
+  color: var(--gc-muted);
+  margin-top: 0.15rem;
+}
+
+.exp-desc {
+  font-size: 0.75rem;
+  color: var(--gc-muted);
+  line-height: 1.6;
+  margin-top: 0.3rem;
+}
+
+.comp-ring {
+  text-align: center;
+  padding: 0.5rem 0 0.75rem;
+}
+
+.comp-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2rem;
+  color: var(--gc-green);
+}
+
+.comp-sub {
+  font-size: 0.72rem;
+  color: var(--gc-muted);
+}
+
+.comp-bar-bg {
+  background: #EAF3DE;
+  border-radius: 4px;
+  height: 8px;
+  margin: 0.5rem 0;
+}
+
+.comp-bar {
+  background: var(--gc-green);
+  border-radius: 4px;
+  height: 8px;
+}
+
+.checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.25rem 0;
+  color: var(--gc-muted);
+}
+
+.check-done {
+  color: var(--gc-green);
+  font-size: 12px;
+}
+
+.check-todo {
+  color: #D3D1C7;
+  font-size: 12px;
+}
+
+.ai-tip {
+  background: var(--gc-green-light);
+  border-radius: 10px;
+  padding: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.ai-tip-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--gc-green);
+  margin-bottom: 0.35rem;
+}
+
+.ai-tip-body {
+  font-size: 0.75rem;
+  color: var(--gc-muted);
+  line-height: 1.6;
+}
+
+.badge {
+  background: var(--gc-green);
+  color: #fff;
+  font-size: 0.62rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: auto;
+}
 </style>
