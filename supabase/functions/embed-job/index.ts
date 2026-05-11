@@ -11,27 +11,83 @@ serve(async (req) => {
   }
 
   try {
-    const { studentId, jobId, studentSkills, jobSkills, jobTitle } = await req.json()
+    const { jobId, title, description, skills } = await req.json()
     
-    const GEMINI_API_KEY =
-      Deno.env.get('GEMINI_API_KEY') || Deno.env.get('VITE_GEMINI_API_KEY')
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
     
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY not configured')
     }
 
-    if (!studentSkills?.length || !jobSkills?.length) {
-      throw new Error('studentSkills and jobSkills are required')
+    // Combine job text for embedding
+    const jobText = `${title || ''} ${description || ''} ${skills?.join(' ') || ''}`
+    
+    if (!jobText.trim()) {
+      throw new Error('No job text provided')
     }
 
-    const result = await callGeminiForMatch(studentSkills, jobSkills, jobTitle || 'Job opening', GEMINI_API_KEY)
+    // Generate embedding using Gemini
+    const embedding = await getGeminiEmbedding(jobText, GEMINI_API_KEY)
+    
+    // NEW: Save to job_embeddings table
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('EMBEDDING_SERVICE_KEY')
+    
+    if (supabaseUrl && supabaseServiceKey) {
+      // Check if embedding already exists
+      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/job_embeddings?job_id=eq.${jobId}&select=id`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        }
+      })
+      
+      const existing = await checkResponse.json()
+      
+      if (existing && existing.length > 0) {
+        // Update existing embedding
+        await fetch(`${supabaseUrl}/rest/v1/job_embeddings?job_id=eq.${jobId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            embedding: embedding,
+            updated_at: new Date().toISOString()
+          })
+        })
+        console.log('Updated embedding for job:', jobId)
+      } else {
+        // Insert new embedding
+        await fetch(`${supabaseUrl}/rest/v1/job_embeddings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            job_id: jobId,
+            embedding: embedding,
+            created_at: new Date().toISOString()
+          })
+        })
+        console.log('Inserted embedding for job:', jobId)
+      }
+    } else {
+      console.warn('Missing Supabase credentials - embedding not saved')
+    }
     
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({ embedding, success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('match-job error:', error.message)
+    console.error('embed-job error:', error.message)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -39,88 +95,32 @@ serve(async (req) => {
   }
 })
 
-async function callGeminiForMatch(
-  studentSkills: string[],
-  jobSkills: string[],
-  jobTitle: string,
-  apiKey: string
-) {
-  const data = await generateWithGemini(`You are a recruitment AI. Calculate a match score for this student and job.
+async function getGeminiEmbedding(text: string, apiKey: string): Promise<number[]> {
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      model: 'models/text-embedding-004',
+      content: { parts: [{ text: text.substring(0, 2000) }] }
+    })
+  })
 
-Student Skills: ${studentSkills.join(', ')}
-Job Title: ${jobTitle}
-Job Required Skills: ${jobSkills.join(', ')}
-
-Return ONLY valid JSON, no other text:
-{
-  "score": <number between 0 and 100>,
-  "rationale": "<2-3 sentence explanation of why this student is or isn't a good fit>"
-}`, apiKey)
-
-  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-
-  try {
-    const parsed = JSON.parse(text)
-    return {
-      score: Math.min(100, Math.max(0, Number(parsed.score) || 0)),
-      rationale: parsed.rationale || 'No rationale provided'
-    }
-  } catch {
-    console.error('Failed to parse Gemini response:', text)
-    // Fall back to simple skill matching if JSON parse fails
-    return {
-      score: calculateSimpleMatch(studentSkills, jobSkills),
-      rationale: 'Score based on skill overlap analysis.'
-    }
-  }
-}
-
-function calculateSimpleMatch(studentSkills: string[], jobSkills: string[]): number {
-  if (!jobSkills.length) return 50
-  const matched = studentSkills.filter(s =>
-    jobSkills.some(js => js.toLowerCase() === s.toLowerCase())
-  )
-  return Math.round((matched.length / jobSkills.length) * 100)
-}
-
-async function generateWithGemini(prompt: string, apiKey: string) {
-  const models = [
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-2.0-flash',
-  ]
-  const errors: string[] = []
-
-  for (const model of models) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 300,
-            responseMimeType: 'application/json',
-          }
-        })
-      }
-    )
-
-    const data = await response.json()
-    console.log(`Gemini match status (${model}):`, response.status)
-    if (response.ok) return data
-
-    const message = data.error?.message || 'Unknown'
-    errors.push(`${model}: ${message}`)
-    console.error(`Gemini error from ${model}:`, JSON.stringify(data))
+  const data = await response.json()
+  
+  console.log('Gemini embedding status:', response.status)
+  
+  if (!response.ok) {
+    console.error('Gemini embedding error:', JSON.stringify(data))
+    throw new Error(`Gemini API error: ${data.error?.message || 'Unknown error'}`)
   }
 
-  throw new Error(`Gemini API error: ${errors.join(' | ')}`)
+  if (!data.embedding?.values) {
+    console.error('Unexpected response shape:', JSON.stringify(data))
+    throw new Error('No embedding values returned')
+  }
+
+  return data.embedding.values
 }

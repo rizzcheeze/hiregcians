@@ -29,8 +29,6 @@
           <div class="page-sub">Upload your PDF resume and preview the extracted profile used for compatibility scoring.</div>
         </div>
         <div style="display:flex;gap:0.5rem">
-          <!-- FIX #7: was pointing to '/student/public-profile' which doesn't exist yet; 
-               kept the same route but added a fallback note — update once PublicProfile.vue is created -->
           <button class="btn-outline" @click="$router.push('/student/public-profile')">Public profile</button>
           <button class="btn-sm" @click="$router.push('/student/applications')">My applications</button>
         </div>
@@ -50,8 +48,7 @@
             <div v-if="uploadStatus && !uploading" class="upload-status" :class="{ 'status-success': uploadSuccess, 'status-error': !uploadSuccess }">
               {{ uploadStatus }}
             </div>
-
-            <!-- FIX #3: Corrected step order — Upload first, then Read/Parse, then AI, then Save, then Match -->
+            <!-- Step indicator while uploading -->
             <div v-if="uploading" class="upload-steps">
               <div class="step" :class="{ active: uploadStep >= 1, done: uploadStep > 1 }">1. Uploading file</div>
               <div class="step" :class="{ active: uploadStep >= 2, done: uploadStep > 2 }">2. Reading PDF</div>
@@ -119,6 +116,7 @@ const aiSummary = ref('')
 const recruiterTip = ref('')
 const program = ref('')
 const section = ref('')
+let lastResumeId = null
 
 const firstName = computed(() => authStore.profile?.first_name || '')
 const lastName  = computed(() => authStore.profile?.last_name || '')
@@ -141,27 +139,14 @@ const handleFileSelect = (event) => {
   }
 }
 
-// FIX #2: Mobile-optimized PDF extraction — processes pages in chunks of 3
-// to avoid blocking the main thread on low-end devices
 const extractTextFromPDF = async (file) => {
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
   let fullText = ''
-  const chunkSize = 3
-  for (let i = 1; i <= pdf.numPages; i += chunkSize) {
-    const end = Math.min(i + chunkSize - 1, pdf.numPages)
-    const pagePromises = []
-    for (let p = i; p <= end; p++) {
-      pagePromises.push(
-        pdf.getPage(p)
-          .then(page => page.getTextContent())
-          .then(tc => tc.items.map(item => item.str).join(' ') + '\n')
-      )
-    }
-    const chunkTexts = await Promise.all(pagePromises)
-    fullText += chunkTexts.join('')
-    // Yield to browser between chunks so UI stays responsive on mobile
-    await new Promise(r => setTimeout(r, 0))
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const textContent = await page.getTextContent()
+    fullText += textContent.items.map(item => item.str).join(' ') + '\n'
   }
   return fullText.trim()
 }
@@ -173,23 +158,21 @@ const uploadResume = async () => {
   }
 
   uploading.value = true
-  uploadStep.value = 0
+  uploadStep.value = 1
   uploadStatus.value = ''
   uploadSuccess.value = false
 
   try {
-    // FIX #3: Step 1 — Upload file FIRST (matches the new label order)
+    // Step 1 — Upload file to storage (order fixed: upload first)
     uploadStep.value = 1
     const fileExt = selectedFile.value.name.split('.').pop()
     const fileName = `${authStore.user.id}/${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage
-      .from('resumes')
-      .upload(fileName, selectedFile.value)
+    const { error: uploadError } = await supabase.storage.from('resumes').upload(fileName, selectedFile.value)
     if (uploadError) throw new Error('File upload failed: ' + uploadError.message)
     const { data: urlData } = supabase.storage.from('resumes').getPublicUrl(fileName)
     const resumeUrl = urlData.publicUrl
 
-    // Step 2 — Extract text from PDF (chunked for mobile)
+    // Step 2 — Extract text from PDF
     uploadStep.value = 2
     const extractedText = await extractTextFromPDF(selectedFile.value)
     if (!extractedText || extractedText.length < 50) {
@@ -208,13 +191,15 @@ const uploadResume = async () => {
     // Step 4 — Save to resumes table + update student_profiles.skills
     uploadStep.value = 4
 
+    // Deactivate old resumes
     await supabase
       .from('resumes')
       .update({ is_active: false })
       .eq('student_id', authStore.user.id)
       .eq('is_active', true)
 
-    const { error: saveError } = await supabase.from('resumes').insert({
+    // Insert new resume record
+    const { data: resumeData, error: saveError } = await supabase.from('resumes').insert({
       student_id: authStore.user.id,
       file_url: resumeUrl,
       is_active: true,
@@ -223,15 +208,21 @@ const uploadResume = async () => {
       parsed_experience: data.achievements.map(a => ({ description: a, quantifiable: true })),
       ai_summary: data.summary,
       recruiter_tip: data.recruiterTip
-    })
+    }).select()
+
     if (saveError) throw new Error('Failed to save resume: ' + saveError.message)
 
+    const newResume = Array.isArray(resumeData) ? resumeData[0] : resumeData
+    lastResumeId = newResume?.id
+
+    // Update skills on student profile
     const { error: skillsError } = await supabase
       .from('student_profiles')
       .update({ skills: data.skills })
       .eq('user_id', authStore.user.id)
     if (skillsError) throw new Error('Failed to save skills: ' + skillsError.message)
 
+    // Verify skills were actually saved before computing matches
     const { data: verifyProfile } = await supabase
       .from('student_profiles')
       .select('skills')
@@ -241,10 +232,29 @@ const uploadResume = async () => {
       throw new Error('Skills were not saved correctly. Please try uploading again.')
     }
 
-    // Step 5 — Compute match scores
+    // Step 5 — Generate embedding for cosine similarity
     uploadStep.value = 5
+    if (lastResumeId && extractedText) {
+      try {
+        await supabase.functions.invoke('embed-resume', {
+          body: {
+            resumeId: lastResumeId,
+            text: extractedText,
+            studentId: authStore.user.id
+          }
+        })
+        console.log('Embedding generated for resume')
+      } catch (embedError) {
+        console.error('Failed to generate embedding:', embedError)
+        // Continue anyway - embedding can be retried later
+      }
+    }
+
+    // Step 6 — Compute match scores
+    uploadStep.value = 5 // Keep at 5 for display
     await computeMatchesForStudent(authStore.user.id)
 
+    // Done — update UI
     extractedSkills.value = data.skills
     achievements.value = data.achievements
     aiSummary.value = data.summary
@@ -293,6 +303,7 @@ const fetchExistingResume = async () => {
       }
       if (resume.ai_summary) aiSummary.value = resume.ai_summary
       if (resume.recruiter_tip) recruiterTip.value = resume.recruiter_tip
+      lastResumeId = resume.id
     }
   } catch (err) {
     console.error('Error loading existing resume:', err)
@@ -316,10 +327,13 @@ onMounted(() => { fetchExistingResume() })
 .upload-status { margin-top: 0.75rem; font-size: 0.75rem; padding: 0.5rem; border-radius: 8px; }
 .status-success { background: var(--gc-green-light); color: var(--gc-green); }
 .status-error { background: #FEF0F0; color: #B03030; }
+
+/* Step indicator */
 .upload-steps { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .step { font-size: 0.72rem; color: #B4B2A9; padding: 0.25rem 0; transition: color 0.2s; }
 .step.active { color: var(--gc-green); font-weight: 500; }
 .step.done { color: #97C459; }
+
 .skills-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .skill-chip { font-size: 0.75rem; background: var(--gc-green-light); color: var(--gc-green); padding: 4px 12px; border-radius: 20px; }
 .quant-row { padding: 0.65rem 0; border-bottom: 0.5px solid #EAF3DE; font-size: 0.8rem; color: var(--gc-muted); line-height: 1.6; }

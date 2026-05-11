@@ -12,20 +12,74 @@ serve(async (req) => {
 
   try {
     const { studentId, jobId, studentSkills, jobSkills, jobTitle } = await req.json()
-
-    const GEMINI_API_KEY =
-      Deno.env.get('GEMINI_API_KEY') || Deno.env.get('VITE_GEMINI_API_KEY')
-
+    
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+    
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY not configured')
     }
 
     if (!studentSkills?.length || !jobSkills?.length) {
-      throw new Error('studentSkills and jobSkills are required')
+      // Fallback to simple matching
+      return new Response(
+        JSON.stringify({
+          score: calculateSimpleMatch(studentSkills || [], jobSkills || []),
+          rationale: 'Score based on skill overlap analysis.'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const result = await callGeminiForMatch(studentSkills, jobSkills, jobTitle || 'Job opening', GEMINI_API_KEY)
-
+    
+    // Save match score to database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('EMBEDDING_SERVICE_KEY')
+    
+    if (supabaseUrl && supabaseServiceKey && studentId && jobId) {
+      // Check if match already exists
+      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/match_scores?student_id=eq.${studentId}&job_id=eq.${jobId}&select=id`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        }
+      })
+      
+      const existing = await checkResponse.json()
+      
+      const matchData = {
+        student_id: studentId,
+        job_id: jobId,
+        score: result.score / 100,
+        rationale: result.rationale,
+        computed_at: new Date().toISOString()
+      }
+      
+      if (existing && existing.length > 0) {
+        await fetch(`${supabaseUrl}/rest/v1/match_scores?student_id=eq.${studentId}&job_id=eq.${jobId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify(matchData)
+        })
+      } else {
+        await fetch(`${supabaseUrl}/rest/v1/match_scores`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify(matchData)
+        })
+      }
+    }
+    
     return new Response(
       JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -39,6 +93,14 @@ serve(async (req) => {
   }
 })
 
+function calculateSimpleMatch(studentSkills: string[], jobSkills: string[]): number {
+  if (!jobSkills.length) return 50
+  const matched = studentSkills.filter(s =>
+    jobSkills.some(js => js.toLowerCase() === s.toLowerCase())
+  )
+  return Math.round((matched.length / jobSkills.length) * 100)
+}
+
 async function callGeminiForMatch(
   studentSkills: string[],
   jobSkills: string[],
@@ -51,47 +113,13 @@ Student Skills: ${studentSkills.join(', ')}
 Job Title: ${jobTitle}
 Job Required Skills: ${jobSkills.join(', ')}
 
-Return ONLY valid JSON, no other text:
+Return ONLY valid JSON:
 {
-  "score": 75,
-  "rationale": "2-3 sentence explanation of why this student is or is not a good fit"
+  "score": <number between 0 and 100>,
+  "rationale": "<2-3 sentence explanation>"
 }`
 
-  const data = await generateWithGemini(prompt, apiKey)
-
-  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-
-  try {
-    const parsed = JSON.parse(text)
-    return {
-      score: Math.min(100, Math.max(0, Number(parsed.score) || 0)),
-      rationale: parsed.rationale || 'No rationale provided'
-    }
-  } catch {
-    console.error('Failed to parse Gemini response:', text)
-    return {
-      score: calculateSimpleMatch(studentSkills, jobSkills),
-      rationale: 'Score based on skill overlap analysis.'
-    }
-  }
-}
-
-function calculateSimpleMatch(studentSkills: string[], jobSkills: string[]): number {
-  if (!jobSkills.length) return 50
-  const matched = studentSkills.filter(s =>
-    jobSkills.some(js => js.toLowerCase() === s.toLowerCase())
-  )
-  return Math.round((matched.length / jobSkills.length) * 100)
-}
-
-async function generateWithGemini(prompt: string, apiKey: string) {
-  const models = [
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-2.0-flash',
-  ]
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash']
   const errors: string[] = []
 
   for (const model of models) {
@@ -108,20 +136,32 @@ async function generateWithGemini(prompt: string, apiKey: string) {
           generationConfig: {
             temperature: 0.2,
             maxOutputTokens: 300,
-            responseMimeType: 'application/json',
           }
         })
       }
     )
 
     const data = await response.json()
-    console.log(`Gemini match status (${model}):`, response.status)
-    if (response.ok) return data
-
-    const message = data.error?.message || 'Unknown'
-    errors.push(`${model}: ${message}`)
-    console.error(`Gemini error from ${model}:`, JSON.stringify(data))
+    if (response.ok) {
+      let text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      
+      try {
+        const parsed = JSON.parse(text)
+        return {
+          score: Math.min(100, Math.max(0, Number(parsed.score) || 0)),
+          rationale: parsed.rationale || 'Score based on skill analysis.'
+        }
+      } catch {
+        // Fall through to next model
+      }
+    }
+    errors.push(`${model}: ${data.error?.message || 'Unknown'}`)
   }
 
-  throw new Error(`Gemini API error: ${errors.join(' | ')}`)
+  // Fallback to simple calculation
+  return {
+    score: calculateSimpleMatch(studentSkills, jobSkills),
+    rationale: 'Score based on skill overlap analysis.'
+  }
 }
