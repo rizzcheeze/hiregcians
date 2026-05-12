@@ -152,10 +152,6 @@
                   <div class="detail-label">Location</div>
                   <div class="detail-value">{{ selectedUser.location || '—' }}</div>
                 </div>
-                <div class="detail-row">
-                  <div class="detail-label">About</div>
-                  <div class="detail-value muted">{{ selectedUser.about || 'No description provided' }}</div>
-                </div>
               </template>
 
               <!-- Admin -->
@@ -240,18 +236,29 @@ const fetchUsers = async () => {
   try {
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select(`
-        id, first_name, last_name, email, role, created_at,
-        student_profiles(program, section, about, skills, experience, avatar_url),
-        employer_profiles(company_name, industry, location)
-      `)
+      .select('id, first_name, last_name, email, role, created_at')
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
+    const studentIds = (profiles || []).filter(p => p.role === 'student').map(p => p.id)
+    const employerIds = (profiles || []).filter(p => p.role === 'employer').map(p => p.id)
+
+    const [{ data: studentProfiles }, { data: employerProfiles }] = await Promise.all([
+      studentIds.length
+        ? supabase.from('student_profiles').select('user_id, program, section, about, skills, experience, avatar_url').in('user_id', studentIds)
+        : Promise.resolve({ data: [] }),
+      employerIds.length
+        ? supabase.from('employer_profiles').select('user_id, company_name, industry, location').in('user_id', employerIds)
+        : Promise.resolve({ data: [] })
+    ])
+
+    const spMap = new Map((studentProfiles || []).map(s => [s.user_id, s]))
+    const epMap = new Map((employerProfiles || []).map(e => [e.user_id, e]))
+
     users.value = (profiles || []).map(profile => {
-      const sp = profile.student_profiles?.[0]
-      const ep = profile.employer_profiles?.[0]
+      const sp = spMap.get(profile.id)
+      const ep = epMap.get(profile.id)
       return {
         id: profile.id,
         name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
@@ -260,13 +267,11 @@ const fetchUsers = async () => {
         created_at: profile.created_at,
         programOrCompany: sp?.program || ep?.company_name || '—',
         avatar_url: sp?.avatar_url || null,
-        // student
         program: sp?.program || '',
         section: sp?.section || '',
         about: sp?.about || '',
         skills: sp?.skills || [],
         experience: sp?.experience || [],
-        // employer
         company_name: ep?.company_name || '',
         industry: ep?.industry || '',
         location: ep?.location || '',
