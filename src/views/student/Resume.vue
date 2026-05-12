@@ -119,8 +119,8 @@ const section = ref('')
 let lastResumeId = null
 
 const firstName = computed(() => authStore.profile?.first_name || '')
-const lastName = computed(() => authStore.profile?.last_name || '')
-const initials = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
+const lastName  = computed(() => authStore.profile?.last_name || '')
+const initials  = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
 
 const handleLogout = async () => {
   await authStore.logout()
@@ -140,15 +140,15 @@ const handleFileSelect = (event) => {
   }
 }
 
-const extractTextFromPDF = async (file) => {
-  const arrayBuffer = await file.arrayBuffer()
+// FIX: Accepts an ArrayBuffer directly (already read in Step 1, no double-read)
+// Pages processed in chunks of 3 with browser yields to keep UI responsive on mobile
+const extractTextFromPDF = async (arrayBuffer) => {
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
   let fullText = ''
   const CHUNK_SIZE = 3
   for (let i = 1; i <= pdf.numPages; i += CHUNK_SIZE) {
     const end = Math.min(i + CHUNK_SIZE - 1, pdf.numPages)
     const pagePromises = []
-
     for (let p = i; p <= end; p++) {
       pagePromises.push(
         pdf.getPage(p)
@@ -156,16 +156,14 @@ const extractTextFromPDF = async (file) => {
           .then(tc => tc.items.map(item => item.str).join(' ') + '\n')
       )
     }
-
     const chunkTexts = await Promise.all(pagePromises)
     fullText += chunkTexts.join('')
-
-    // Yield to browser between chunks
+    // Yield to browser between chunks to keep step indicator updating
     await new Promise(r => setTimeout(r, 0))
   }
-
   return fullText.trim()
 }
+
 const uploadResume = async () => {
   if (!selectedFile.value) {
     uploadStatus.value = 'Please select a PDF file first'
@@ -173,23 +171,32 @@ const uploadResume = async () => {
   }
 
   uploading.value = true
-  uploadStep.value = 1
+  uploadStep.value = 0
   uploadStatus.value = ''
   uploadSuccess.value = false
 
   try {
-    // Step 1 — Upload file to storage
+    // Step 1 — Read file into memory then upload to storage
+    // FIX: arrayBuffer() first so mobile Chrome doesn't stall streaming a raw File object
     uploadStep.value = 1
     const fileExt = selectedFile.value.name.split('.').pop()
     const fileName = `${authStore.user.id}/${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage.from('resumes').upload(fileName, selectedFile.value)
+    const fileBuffer = await selectedFile.value.arrayBuffer()
+
+    const { error: uploadError } = await supabase.storage
+      .from('resumes')
+      .upload(fileName, fileBuffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: false
+      })
     if (uploadError) throw new Error('File upload failed: ' + uploadError.message)
     const { data: urlData } = supabase.storage.from('resumes').getPublicUrl(fileName)
     const resumeUrl = urlData.publicUrl
 
-    // Step 2 — Extract text from PDF
+    // Step 2 — Extract text from PDF (reuse the buffer already in memory)
     uploadStep.value = 2
-    const extractedText = await extractTextFromPDF(selectedFile.value)
+    const extractedText = await extractTextFromPDF(fileBuffer)
     if (!extractedText || extractedText.length < 50) {
       throw new Error('Could not extract enough text from the PDF. Make sure it is not a scanned image.')
     }
@@ -208,6 +215,7 @@ const uploadResume = async () => {
     aiSummary.value = data.summary
     recruiterTip.value = data.recruiterTip
 
+    // Step 4 — Save to resumes table + update student_profiles.skills
     uploadStep.value = 4
 
     await supabase
@@ -244,23 +252,16 @@ const uploadResume = async () => {
     uploading.value = false
     uploadStep.value = 0
 
+    // Step 5 — Generate embeddings + compute matches (non-fatal if they fail)
     uploadStep.value = 5
     try {
       if (lastResumeId && extractedText) {
         const { data: embedData, error: embedError } = await supabase.functions.invoke('embed-resume', {
-          body: {
-            resumeId: lastResumeId,
-            text: extractedText
-          }
+          body: { resumeId: lastResumeId, text: extractedText }
         })
-
         console.log('Embed response:', { embedData, embedError })
-
-        if (embedError) {
-          console.error('Embed error:', embedError)
-        } else {
-          console.log('Embed success:', embedData)
-        }
+        if (embedError) console.error('Embed error:', embedError)
+        else console.log('Embed success:', embedData)
       } else {
         console.warn('Skipping embed - missing resumeId or text')
       }

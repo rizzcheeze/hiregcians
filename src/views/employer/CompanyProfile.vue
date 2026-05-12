@@ -57,15 +57,14 @@
                 <label class="form-label">Industry</label>
                 <select class="form-select" v-model="form.industry">
                   <option value="">Select industry</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Education">Education</option>
-                  <option value="Healthcare">Healthcare</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Retail">Retail</option>
-                  <option value="Manufacturing">Manufacturing</option>
-                  <option value="Consulting">Consulting</option>
-                  <option value="Non-profit">Non-profit</option>
-                  <option value="Other">Other</option>
+                  <option value="Software Development">Software Development</option>
+                  <option value="Web & Mobile Development">Web & Mobile Development</option>
+                  <option value="IT Services & Consulting">IT Services & Consulting</option>
+                  <option value="Artificial Intelligence">Artificial Intelligence / Machine Learning</option>
+                  <option value="Cybersecurity">Cybersecurity</option>
+                  <option value="Cloud Computing">Cloud Computing & DevOps</option>
+                  <option value="Data Analytics">Data Analytics & Business Intelligence</option>
+                  <option value="Game Development">Game Development</option>
                 </select>
               </div>
               <div class="form-group">
@@ -720,7 +719,7 @@ onMounted(() => {
   border-radius: 20px;
 }
 
-/* Mobile Responsive */
+
 @media (max-width: 900px) {
   .profile-layout {
     grid-template-columns: 1fr;
