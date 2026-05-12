@@ -49,10 +49,10 @@
       <div class="dashboard-layout">
         <div>
           <div class="section-head">
-            Recommended for you 
+            Recommended for you
             <span class="see-all" @click="$router.push('/student/jobs')">See all →</span>
           </div>
-          
+
           <div v-if="loading" class="text-center" style="padding:2rem;">Loading recommendations...</div>
           <div v-else-if="recommendedJobs.length === 0" class="text-center" style="padding:2rem; background:white; border-radius:10px;">
             No job matches yet. Upload your resume to get personalized matches!
@@ -85,7 +85,7 @@
 
         <div>
           <div class="section-head">Your profile</div>
-          
+
           <div class="profile-card">
             <div class="profile-label">Skills on file</div>
             <div class="skills-wrap">
@@ -93,7 +93,7 @@
               <span v-if="skills.length === 0" class="skill-tag">No skills yet</span>
             </div>
           </div>
-          
+
           <div class="profile-card">
             <div class="profile-label">Profile completeness</div>
             <div class="prog-bar-bg">
@@ -104,7 +104,7 @@
               <span @click="$router.push('/student/resume')" style="cursor:pointer">Add resume →</span>
             </div>
           </div>
-          
+
           <div class="profile-card" style="background:var(--gc-green-light);border-color:#97C459">
             <div style="font-size:0.78rem;color:var(--gc-green);font-weight:500;margin-bottom:0.35rem">💡 Tip from the AI engine</div>
             <div style="font-size:0.75rem;color:var(--gc-muted);line-height:1.6">
@@ -133,28 +133,33 @@ const loading = ref(true)
 const recommendedJobs = ref([])
 const applicationsCount = ref(0)
 const skills = ref([])
+const experiences = ref([])
+const about = ref('')
 const topMatchScore = ref(0)
 const program = ref('')
 const section = ref('')
+const resumeUrl = ref(null)
 
-const firstName = computed(() => authStore.profile?.first_name || 'Allyana')
-const lastName = computed(() => authStore.profile?.last_name || 'Espiridion')
-const initials = computed(() => (firstName.value.charAt(0) || 'A') + (lastName.value.charAt(0) || 'E'))
+const firstName = computed(() => authStore.profile?.first_name || '')
+const lastName = computed(() => authStore.profile?.last_name || '')
+const initials = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
 
 const completenessPercent = computed(() => {
   let score = 0
-  if (firstName.value && firstName.value !== 'Allyana') score += 15
-  if (lastName.value && lastName.value !== 'Espiridion') score += 15
-  if (program.value) score += 20
-  if (section.value) score += 20
-  if (skills.value.length > 0) score += 30
+  if (firstName.value && lastName.value) score += 15
+  if (program.value) score += 15
+  if (section.value) score += 15
+  if (skills.value.length > 0) score += 20
+  if (experiences.value.length > 0) score += 20
+  if (about.value) score += 15
   return Math.min(score, 100)
 })
 
 const aiTip = computed(() => {
-  if (skills.value.length === 0) return "Upload your resume to get AI-powered skill extraction!"
-  if (completenessPercent.value < 50) return "Complete your profile to increase match scores!"
-  return "Your profile looks great! Keep applying!"
+  if (skills.value.length === 0) return 'Upload your resume to get AI-powered skill extraction!'
+  if (experiences.value.length === 0) return 'Add your experience and involvement to stand out to employers!'
+  if (completenessPercent.value < 70) return 'Complete your profile to increase match scores!'
+  return 'Your profile looks great! Keep applying!'
 })
 
 const getMatchClass = (score) => {
@@ -182,12 +187,12 @@ const applyForJob = async (job) => {
       .eq('job_id', job.id)
       .eq('student_id', authStore.user.id)
       .maybeSingle()
-    
+
     if (existing) {
       alert('You have already applied for this job!')
       return
     }
-    
+
     const { error } = await supabase
       .from('applications')
       .insert({
@@ -196,9 +201,9 @@ const applyForJob = async (job) => {
         status: 'pending',
         applied_at: new Date().toISOString()
       })
-    
+
     if (error) throw error
-    
+
     applicationsStore.triggerRefresh()
     alert('Application submitted successfully!')
   } catch (error) {
@@ -231,9 +236,9 @@ const loadMatchedJobs = async () => {
   const employerIds = [...new Set(matches.map(m => m.job?.employer_id).filter(Boolean))]
   const { data: employers } = employerIds.length
     ? await supabase
-      .from('employer_profiles')
-      .select('user_id, company_name')
-      .in('user_id', employerIds)
+        .from('employer_profiles')
+        .select('user_id, company_name')
+        .in('user_id', employerIds)
     : { data: [] }
   const employerMap = new Map((employers || []).map(e => [e.user_id, e.company_name]))
 
@@ -251,15 +256,26 @@ const fetchData = async () => {
   try {
     const { data: studentData } = await supabase
       .from('student_profiles')
-      .select('program, section, skills')
+      .select('program, section, skills, experience, about')
       .eq('user_id', authStore.user.id)
       .maybeSingle()
-    
+
     if (studentData) {
       program.value = studentData.program || ''
       section.value = studentData.section || ''
       skills.value = studentData.skills || []
+      experiences.value = studentData.experience || []
+      about.value = studentData.about || ''
     }
+
+    const { data: resume } = await supabase
+      .from('resumes')
+      .select('file_url')
+      .eq('student_id', authStore.user.id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    resumeUrl.value = resume?.file_url || null
 
     let matchedJobs = await loadMatchedJobs()
 
@@ -279,12 +295,12 @@ const fetchData = async () => {
         .limit(10)
       recommendedJobs.value = jobs || []
     }
-    
+
     const { count } = await supabase
       .from('applications')
       .select('*', { count: 'exact', head: true })
       .eq('student_id', authStore.user.id)
-    
+
     applicationsCount.value = count || 0
   } catch (error) {
     console.error('Error fetching data:', error)
