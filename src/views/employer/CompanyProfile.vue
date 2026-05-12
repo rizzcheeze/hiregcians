@@ -56,7 +56,6 @@
               <div class="form-group">
                 <label class="form-label">Industry</label>
                 <select class="form-select" v-model="form.industry">
-                  <option value="">Select industry</option>
                   <option value="Software Development">Software Development</option>
                   <option value="Web & Mobile Development">Web & Mobile Development</option>
                   <option value="IT Services & Consulting">IT Services & Consulting</option>

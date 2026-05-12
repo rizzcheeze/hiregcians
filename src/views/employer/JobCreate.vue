@@ -64,21 +64,18 @@
 
             <div class="form-row">
               <div class="form-section" style="margin-bottom:0">
-                <label class="form-label">Schedule</label>
-                <select v-model="settings.availability" class="form-select">
-                  <option value="">Select</option>
+                <label class="form-label">Schedule / Shift</label>
+                <select v-model="form.schedule" class="form-select">
+                  <option value="">Select schedule</option>
                   <option value="weekdays_morning">Weekdays - Morning (8AM - 12PM)</option>
                   <option value="weekdays_afternoon">Weekdays - Afternoon (1PM - 5PM)</option>
                   <option value="weekdays_evening">Weekdays - Evening (6PM - 9PM)</option>
                   <option value="weekends_morning">Weekends - Morning (8AM - 12PM)</option>
                   <option value="weekends_afternoon">Weekends - Afternoon (1PM - 5PM)</option>
-                  <option value="full_time">Full-time availability</option>
+                  <option value="full_time">Full-time (40 hours/week)</option>
+                  <option value="part_time">Part-time (20 hours/week)</option>
                   <option value="flexible">Flexible schedule</option>
                 </select>
-              </div>
-              <div class="form-section" style="margin-bottom:0">
-                <label class="form-label">Number of slots</label>
-                <input class="form-input" type="number" v-model="form.slots" placeholder="e.g., 2" style="width:100px" />
               </div>
             </div>
 
