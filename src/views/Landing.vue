@@ -52,6 +52,8 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import qrCode from '@/assets/qr-code.png' // ← put your QR image in src/assets/ and rename it qr-code.png
+
 const router = useRouter()
 
 const goBack = () => {
