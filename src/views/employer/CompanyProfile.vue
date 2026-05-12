@@ -31,7 +31,10 @@
           <div class="page-title">Company Profile</div>
           <div class="page-sub">Manage how your organization appears to students</div>
         </div>
-        <button class="btn-primary" @click="saveProfile" :disabled="saving">{{ saving ? 'Saving...' : 'Save Changes' }}</button>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn-outline" @click="$router.push('/employer/public-company')">Open public page</button>
+          <button class="btn-primary" @click="saveProfile" :disabled="saving">{{ saving ? 'Saving...' : 'Save Changes' }}</button>
+        </div>
       </div>
 
       <div v-if="errorMessage" class="error-banner">

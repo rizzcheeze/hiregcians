@@ -32,9 +32,11 @@ authStore.init()
 const route = useRoute()
 const sidebarOpen = ref(false)
 const showSidebarToggle = computed(() =>
-  route.path.startsWith('/student') ||
-  route.path.startsWith('/employer') ||
-  route.path.startsWith('/admin')
+  route.meta.showShell !== false && (
+    route.path.startsWith('/student') ||
+    route.path.startsWith('/employer') ||
+    route.path.startsWith('/admin')
+  )
 )
 
 const toggleSidebar = () => {

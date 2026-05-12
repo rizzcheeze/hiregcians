@@ -30,19 +30,17 @@
     <div class="right-panel">
       <div class="auth-box">
 
-        <!-- ── Email sent confirmation screen ── -->
         <div v-if="emailSent" class="email-sent-box">
           <div class="email-sent-icon">✉</div>
           <div class="email-sent-title">Check your email</div>
           <div class="email-sent-sub">
-            We sent a confirmation link to <strong>{{ signupForm.email }}</strong>.
+            We sent a confirmation link to <strong>{{ resolvedEmail }}</strong>.
             Click it to activate your account and get started.
           </div>
           <div class="email-sent-note">Didn't receive it? Check your spam folder.</div>
           <button class="btn-full" style="margin-top: 1.5rem;" @click="emailSent = false">Back to sign up</button>
         </div>
 
-        <!-- ── Sign up form ── -->
         <template v-else>
           <div class="auth-tabs">
             <div class="auth-tab" @click="$router.push('/login')">Log in</div>
@@ -52,11 +50,11 @@
           <div class="auth-heading">Create account</div>
 
           <div class="role-selector">
-            <div class="role-card" :class="{ selected: signupRole === 'student' }" @click="signupRole = 'student'; showEmployerExtras = false">
+            <div class="role-card" :class="{ selected: signupRole === 'student' }" @click="signupRole = 'student'">
               <div class="role-title">Student</div>
               <div class="role-sub">Browse & apply</div>
             </div>
-            <div class="role-card" :class="{ selected: signupRole === 'employer' }" @click="signupRole = 'employer'; showEmployerExtras = true">
+            <div class="role-card" :class="{ selected: signupRole === 'employer' }" @click="signupRole = 'employer'">
               <div class="role-title">Employer</div>
               <div class="role-sub">Post & hire</div>
             </div>
@@ -73,11 +71,34 @@
             </div>
           </div>
 
-          <label class="form-label">Email</label>
-          <input class="form-input" v-model="signupForm.email" type="email" placeholder="yourname@example.com" />
+          <!-- Student: ID number input -->
+          <template v-if="signupRole === 'student'">
+            <label class="form-label">Student ID Number</label>
+            <div class="id-input-wrapper">
+              <input
+                class="form-input id-input"
+                v-model="studentId"
+                type="text"
+                inputmode="numeric"
+                maxlength="9"
+                placeholder="000000000"
+                @input="studentId = studentId.replace(/\D/g, '').slice(0, 9)"
+              />
+              <span class="id-suffix">@gordoncollege.edu.ph</span>
+            </div>
+            <div v-if="studentId.length > 0 && studentId.length < 9" class="field-hint">
+              {{ 9 - studentId.length }} more digit{{ studentId.length === 8 ? '' : 's' }} needed
+            </div>
+          </template>
+
+          <!-- Employer: regular email -->
+          <template v-else>
+            <label class="form-label">Email</label>
+            <input class="form-input" v-model="signupForm.email" type="email" placeholder="yourname@example.com" />
+          </template>
 
           <!-- Student Extras -->
-          <div v-if="signupRole === 'student'" class="signup-extras visible">
+          <div v-if="signupRole === 'student'">
             <div class="form-row">
               <div>
                 <label class="form-label">Program</label>
@@ -102,7 +123,7 @@
           </div>
 
           <!-- Employer Extras -->
-          <div v-if="signupRole === 'employer'" class="signup-extras visible">
+          <div v-if="signupRole === 'employer'">
             <label class="form-label">Company name</label>
             <input class="form-input" v-model="signupForm.company_name" placeholder="Your company name" />
           </div>
@@ -121,7 +142,6 @@
             </span>
           </div>
 
-          <!-- Password strength bar -->
           <div v-if="signupForm.password.length > 0" class="strength-wrapper">
             <div class="strength-bar">
               <div class="strength-fill" :style="{ width: strengthPercent + '%', background: strengthColor }"></div>
@@ -129,7 +149,6 @@
             <div class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</div>
           </div>
 
-          <!-- Password requirements checklist -->
           <div v-if="signupForm.password.length > 0" class="pw-checklist">
             <div class="pw-check" :class="{ met: checks.length }">{{ checks.length ? '✓' : '✗' }} At least 8 characters</div>
             <div class="pw-check" :class="{ met: checks.uppercase }">{{ checks.uppercase ? '✓' : '✗' }} One uppercase letter</div>
@@ -166,9 +185,10 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const signupRole = ref('student')
-const showEmployerExtras = ref(false)
+const studentId = ref('')
 const showPassword = ref(false)
 const emailSent = ref(false)
+
 const signupForm = ref({
   first_name: '',
   last_name: '',
@@ -180,6 +200,13 @@ const signupForm = ref({
 })
 const signupLoading = ref(false)
 const signupError = ref('')
+
+const resolvedEmail = computed(() => {
+  if (signupRole.value === 'student') {
+    return studentId.value + '@gordoncollege.edu.ph'
+  }
+  return signupForm.value.email
+})
 
 const checks = computed(() => ({
   length:    signupForm.value.password.length >= 8,
@@ -215,11 +242,20 @@ const handleSignup = async () => {
     signupError.value = 'Please enter your full name.'
     return
   }
-  if (!validateEmail(signupForm.value.email)) {
-    signupError.value = 'Please enter a valid email address.'
-    return
+
+  if (signupRole.value === 'student') {
+    if (studentId.value.length !== 9) {
+      signupError.value = 'Student ID must be exactly 9 digits.'
+      return
+    }
+  } else {
+    if (!validateEmail(signupForm.value.email)) {
+      signupError.value = 'Please enter a valid email address.'
+      return
+    }
   }
-  if (!isPasswordValid.value || strengthScore.value < 5) {
+
+  if (!isPasswordValid.value) {
     signupError.value = 'Please make sure your password meets all requirements.'
     return
   }
@@ -227,7 +263,7 @@ const handleSignup = async () => {
   signupLoading.value = true
   try {
     await authStore.register({
-      email: signupForm.value.email,
+      email: resolvedEmail.value,
       password: signupForm.value.password,
       first_name: signupForm.value.first_name,
       last_name: signupForm.value.last_name,
@@ -235,7 +271,6 @@ const handleSignup = async () => {
     })
 
     if (authStore.user?.id) {
-      // Email confirmation is OFF — session exists immediately
       if (signupRole.value === 'student') {
         await supabase.from('student_profiles').insert({
           user_id: authStore.user.id,
@@ -250,8 +285,6 @@ const handleSignup = async () => {
       }
       router.push(signupRole.value === 'student' ? '/student/dashboard' : '/employer/dashboard')
     } else {
-      // Email confirmation is ON — no session yet, show confirmation screen
-      // Store signup data so we can create the profile after confirmation
       sessionStorage.setItem('pending_signup', JSON.stringify({
         role: signupRole.value,
         program: signupForm.value.program,
@@ -271,33 +304,9 @@ const handleSignup = async () => {
 <style scoped>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-.auth-container {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--gc-cream);
-  color: var(--gc-dark);
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.left-panel {
-  background: var(--gc-dark);
-  padding: 3rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  position: relative;
-  overflow: hidden;
-}
-
-.left-panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 30% 20%, rgba(99,153,34,0.25) 0%, transparent 60%);
-  pointer-events: none;
-}
-
+.auth-container { font-family: 'DM Sans', sans-serif; background: var(--gc-cream); color: var(--gc-dark); min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+.left-panel { background: var(--gc-dark); padding: 3rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+.left-panel::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 20%, rgba(99,153,34,0.25) 0%, transparent 60%); pointer-events: none; }
 .lp-logo { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: #C0DD97; position: relative; z-index: 1; }
 .lp-logo span { color: #97C459; }
 .lp-hero { position: relative; z-index: 1; margin: 2rem 0; }
@@ -315,7 +324,6 @@ const handleSignup = async () => {
 .right-panel { display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .auth-box { width: 100%; max-width: 400px; }
 
-/* Email sent screen */
 .email-sent-box { text-align: center; padding: 1rem 0; }
 .email-sent-icon { font-size: 3rem; margin-bottom: 1rem; }
 .email-sent-title { font-family: 'DM Serif Display', serif; font-size: 1.8rem; color: var(--gc-dark); margin-bottom: 0.75rem; }
@@ -338,38 +346,4 @@ const handleSignup = async () => {
 .form-input { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; margin-bottom: 1rem; transition: border-color 0.15s; }
 .form-input:focus { border-color: var(--gc-green); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
-.form-select { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; margin-bottom: 1rem; }
-
-.signup-extras { display: none; }
-.signup-extras.visible { display: block; }
-
-.password-wrapper { position: relative; }
-.pw-toggle { position: absolute; right: 0.75rem; top: 0.6rem; cursor: pointer; font-size: 0.75rem; color: var(--gc-muted); user-select: none; }
-
-.strength-wrapper { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-.strength-bar { flex: 1; height: 6px; background: #EAF3DE; border-radius: 4px; overflow: hidden; }
-.strength-fill { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
-.strength-label { font-size: 0.72rem; font-weight: 500; min-width: 60px; }
-
-.pw-checklist { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; }
-.pw-check { font-size: 0.72rem; color: #B4B2A9; transition: color 0.2s; }
-.pw-check.met { color: var(--gc-green); }
-
-.btn-full { width: 100%; background: var(--gc-green); color: #fff; border: none; border-radius: 20px; padding: 0.7rem; font-size: 0.9rem; font-family: 'DM Serif Display', serif; cursor: pointer; transition: opacity 0.15s; margin-top: 0.5rem; }
-.btn-full:hover { opacity: 0.9; }
-.btn-full:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.error-message { color: #B03030; font-size: 0.75rem; margin-bottom: 0.5rem; text-align: center; }
-
-.terms { font-size: 0.72rem; color: #B4B2A9; text-align: center; margin-top: 1.25rem; line-height: 1.6; }
-.terms a { color: var(--gc-green-mid); text-decoration: none; }
-.terms a:hover { text-decoration: underline; }
-
-@media (max-width: 900px) {
-  .auth-container { grid-template-columns: 1fr; }
-  .left-panel { padding: 2rem; min-height: auto; }
-  .right-panel { padding: 1.25rem; }
-  .form-row { grid-template-columns: 1fr; }
-  .role-selector { grid-template-columns: 1fr; }
-}
-</style>
+.form-select { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outlin

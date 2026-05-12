@@ -29,6 +29,7 @@
           <div class="page-sub">Your skills are generated from your uploaded PDF resume and used for job matching.</div>
         </div>
         <div style="display:flex;gap:0.5rem">
+          <button class="btn-outline" @click="$router.push('/student/public-profile')">Open public profile</button>
           <button class="btn-outline" @click="$router.push('/student/resume')">Open resume analysis</button>
           <button class="btn-sm" @click="saveProfile" :disabled="saving">{{ saving ? 'Saving...' : 'Save changes' }}</button>
         </div>

@@ -64,7 +64,17 @@
           <div v-else>
             <div v-for="job in filteredJobs" :key="job.id" class="job-row" :class="{ selected: selectedJob?.id === job.id }" @click="selectJob(job)">
               <div class="jr-top">
-                <div><div class="jr-title">{{ job.title }}</div><div class="jr-dept">{{ job.company_name || 'Company' }}</div></div>
+                <div>
+                  <div class="jr-title">{{ job.title }}</div>
+                  <button
+                    class="company-link"
+                    v-if="job.employer_id"
+                    @click.stop="openCompanyProfile(job.employer_id)"
+                  >
+                    {{ job.company_name || 'Company' }}
+                  </button>
+                  <div v-else class="jr-dept">{{ job.company_name || 'Company' }}</div>
+                </div>
                 <div class="pct" :class="getMatchClass(job.match_score)">{{ Math.round((job.match_score || 0) * 100) }}%</div>
               </div>
               <div class="jr-meta">
@@ -78,7 +88,17 @@
         <div class="detail-panel" v-if="selectedJob">
           <div class="dp-tag">{{ selectedJob.job_type || 'Position' }}</div>
           <div class="dp-title">{{ selectedJob.title }}</div>
-          <div class="dp-dept">{{ selectedJob.company_name || 'Company' }} · Posted {{ formatDate(selectedJob.posted_at) }}</div>
+          <div class="dp-dept">
+            <button
+              class="company-link"
+              v-if="selectedJob.employer_id"
+              @click="openCompanyProfile(selectedJob.employer_id)"
+            >
+              {{ selectedJob.company_name || 'Company' }}
+            </button>
+            <span v-else>{{ selectedJob.company_name || 'Company' }}</span>
+            · Posted {{ formatDate(selectedJob.posted_at) }}
+          </div>
           <div class="dp-match-box">
             <div class="dp-match-label">AI match score</div>
             <div class="dp-match-num">{{ Math.round((selectedJob.match_score || 0) * 100) }}%</div>
@@ -86,7 +106,12 @@
           </div>
           <div class="dp-section"><div class="dp-section-label">About this role</div><div class="dp-section-body">{{ selectedJob.description }}</div></div>
           <div class="dp-section"><div class="dp-section-label">Required skills</div><div class="dp-section-body"><div v-for="skill in selectedJob.required_skills || []" :key="skill" class="skill-match-row"><span class="skill-match-name">{{ skill }}</span><span class="skill-match-yes">✓ Matching</span></div></div></div>
-          <button class="apply-btn-big" @click="handleApply" :disabled="applying">{{ applying ? 'Applying...' : 'Apply now →' }}</button>
+          <div class="action-row">
+            <button class="company-btn" v-if="selectedJob.employer_id" @click="openCompanyProfile(selectedJob.employer_id)">
+              View company profile
+            </button>
+            <button class="apply-btn-big" @click="handleApply" :disabled="applying">{{ applying ? 'Applying...' : 'Apply now →' }}</button>
+          </div>
         </div>
         <div class="detail-panel" v-else><div class="text-center" style="padding:2rem;">Select a job to view details</div></div>
       </div>
@@ -141,6 +166,10 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString() : 'Recently'
 const getMatchClass = (s) => { const p = (s || 0) * 100; return p >= 70 ? 'p-high' : p >= 40 ? 'p-mid' : 'p-low' }
 const selectJob = (j) => selectedJob.value = j
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
+const openCompanyProfile = (employerId) => {
+  if (!employerId) return
+  router.push(`/companies/${employerId}`)
+}
 
 const handleLogout = async () => { 
   await authStore.logout() 
@@ -323,6 +352,17 @@ onMounted(fetchData)
   color: var(--gc-muted);
 }
 
+.company-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--gc-green);
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
 .jr-meta {
   display: flex;
   gap: 0.5rem;
@@ -466,6 +506,25 @@ onMounted(fetchData)
 .apply-btn-big:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.company-btn {
+  width: 100%;
+  background: transparent;
+  color: var(--gc-green);
+  border: 1px solid var(--gc-green);
+  border-radius: 20px;
+  padding: 0.65rem;
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
 }
 
 .search-row {

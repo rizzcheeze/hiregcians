@@ -1,9 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001'
+const GEMINI_EMBEDDING_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_EMBEDDING_MODEL}:embedContent`
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,100 +15,93 @@ serve(async (req) => {
   }
 
   try {
-    const { resumeId, text } = await req.json()
-    
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+    const { resumeId, resume_id, text } = await req.json()
+    const targetResumeId = resumeId || resume_id
+
+    if (!targetResumeId) throw new Error('resumeId is required')
+    if (!text || text.trim().length === 0) throw new Error('No text provided')
+
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('EMBEDDING_SERVICE_KEY')
-    
-    console.log('API Key present:', !!GEMINI_API_KEY)
-    
-    if (!GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY not configured')
-    }
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('EMBEDDING_SERVICE_KEY')
 
-    if (!text || text.trim().length === 0) {
-      throw new Error('No text provided')
-    }
+    if (!geminiApiKey) throw new Error('GEMINI_API_KEY not configured')
+    if (!supabaseUrl || !supabaseServiceKey) throw new Error('Supabase service credentials not configured')
 
-    // Fixed: Correct model name for embeddings
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent', {
+    const response = await fetch(GEMINI_EMBEDDING_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY,
+        'x-goog-api-key': geminiApiKey,
       },
       body: JSON.stringify({
-        model: 'text-embedding-004',  // Fixed: removed 'models/' prefix
-        content: { parts: [{ text: text.substring(0, 2000) }] }
-      })
+        model: GEMINI_EMBEDDING_MODEL,
+        content: { parts: [{ text: text.substring(0, 8000) }] },
+      }),
     })
 
     const data = await response.json()
-    
-    console.log('Gemini embedding status:', response.status)
-    
     if (!response.ok) {
       console.error('Gemini embedding error:', JSON.stringify(data))
       throw new Error(`Gemini API error: ${data.error?.message || 'Unknown error'}`)
     }
 
-    if (!data.embedding?.values) {
+    const embedding = data.embedding?.values
+    if (!Array.isArray(embedding) || embedding.length === 0) {
       throw new Error('No embedding values returned')
     }
 
-    const embedding = data.embedding.values
-    
-    if (supabaseUrl && supabaseServiceKey) {
-      // Check if embedding already exists
-      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/resume_embeddings?resume_id=eq.${resumeId}&select=id`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseServiceKey,
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-        }
-      })
-      
-      const existing = await checkResponse.json()
-      
-      if (existing && existing.length > 0) {
-        await fetch(`${supabaseUrl}/rest/v1/resume_embeddings?resume_id=eq.${resumeId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({ embedding: embedding })
-        })
-        console.log('Updated embedding for resume:', resumeId)
-      } else {
-        await fetch(`${supabaseUrl}/rest/v1/resume_embeddings`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            resume_id: resumeId,
-            embedding: embedding
-          })
-        })
-        console.log('Inserted embedding for resume:', resumeId)
-      }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const embeddingText = `[${embedding.join(',')}]`
+    const { error: rpcError } = await supabase.rpc('upsert_resume_embedding', {
+      resume_id_param: targetResumeId,
+      embedding_param: embeddingText,
+    })
+
+    if (rpcError) {
+      console.warn('upsert_resume_embedding RPC failed, falling back to table write:', rpcError.message)
+      await saveResumeEmbedding(supabase, targetResumeId, embeddingText)
     }
-    
+
     return new Response(
-      JSON.stringify({ success: true, embeddingLength: embedding.length }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, resumeId: targetResumeId, embeddingLength: embedding.length }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (error) {
     console.error('embed-resume error:', error.message)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
 })
+
+async function saveResumeEmbedding(supabase: any, resumeId: string, embeddingText: string) {
+  const payload = {
+    resume_id: resumeId,
+    embedding: embeddingText,
+    created_at: new Date().toISOString(),
+  }
+
+  const { data: existing, error: selectError } = await supabase
+    .from('resume_embeddings')
+    .select('id')
+    .eq('resume_id', resumeId)
+    .maybeSingle()
+
+  if (selectError) throw new Error(`Failed to check resume embedding: ${selectError.message}`)
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('resume_embeddings')
+      .update(payload)
+      .eq('id', existing.id)
+    if (error) throw new Error(`Failed to update resume embedding: ${error.message}`)
+    return
+  }
+
+  const { error } = await supabase
+    .from('resume_embeddings')
+    .insert(payload)
+  if (error) throw new Error(`Failed to insert resume embedding: ${error.message}`)
+}

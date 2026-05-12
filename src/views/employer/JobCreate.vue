@@ -227,9 +227,11 @@ const createJob = async () => {
 
     const job = Array.isArray(data) ? data[0] : data
     if (job?.id) {
+      let embeddingGenerated = false
+
       // Generate embedding for cosine similarity
       try {
-        await supabase.functions.invoke('embed-job', {
+        const { data: embedData, error: embedError } = await supabase.functions.invoke('embed-job', {
           body: {
             jobId: job.id,
             title: form.value.title,
@@ -237,13 +239,22 @@ const createJob = async () => {
             skills: skills.value
           }
         })
+        if (embedError || embedData?.success === false) {
+          throw new Error(embedData?.error || embedError?.message || 'Failed to generate job embedding')
+        }
+        embeddingGenerated = true
         console.log('Embedding generated for job')
       } catch (embedError) {
         console.error('Failed to generate embedding:', embedError)
-        // Continue anyway - computeMatchesForJob will handle matching
       }
 
-      await computeMatchesForJob(job.id)
+      if (embeddingGenerated) {
+        try {
+          await computeMatchesForJob(job.id)
+        } catch (matchError) {
+          console.error('Failed to compute cosine matches:', matchError)
+        }
+      }
     }
 
     alert('Job posted successfully!')

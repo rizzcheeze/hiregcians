@@ -27,11 +27,23 @@ const routes = [
   name: 'Terms',
   component: () => import('@/views/Terms.vue')
 },
-{
-  path: '/privacy',
-  name: 'Privacy',
-  component: () => import('@/views/Privacy.vue')
-},
+  {
+    path: '/privacy',
+    name: 'Privacy',
+    component: () => import('@/views/Privacy.vue')
+  },
+  {
+    path: '/students/:id',
+    name: 'PublicStudentProfile',
+    component: () => import('@/views/public/StudentProfile.vue'),
+    meta: { showShell: false }
+  },
+  {
+    path: '/companies/:id',
+    name: 'PublicCompanyProfile',
+    component: () => import('@/views/public/CompanyProfile.vue'),
+    meta: { showShell: false }
+  },
   // Student routes
   {
     path: '/student/dashboard',
@@ -62,6 +74,12 @@ const routes = [
     name: 'StudentProfile',
     component: () => import('@/views/student/Profile.vue'),
     meta: { requiresAuth: true, role: 'student' }
+  },
+  {
+    path: '/student/public-profile',
+    name: 'StudentPublicProfile',
+    component: () => import('@/views/public/StudentProfile.vue'),
+    meta: { requiresAuth: true, role: 'student', showShell: false }
   },
   {
     path: '/student/resume',
@@ -118,6 +136,12 @@ const routes = [
     name: 'EmployerCompany',
     component: () => import('@/views/employer/CompanyProfile.vue'),
     meta: { requiresAuth: true, role: 'employer' }
+  },
+  {
+    path: '/employer/public-company',
+    name: 'EmployerPublicCompany',
+    component: () => import('@/views/public/CompanyProfile.vue'),
+    meta: { requiresAuth: true, role: 'employer', showShell: false }
   },
 
   // Admin routes

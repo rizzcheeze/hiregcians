@@ -61,7 +61,14 @@
             <div v-for="job in recommendedJobs.slice(0, 5)" :key="job.id" class="job-card">
               <div>
                 <div class="job-title">{{ job.title }}</div>
-                <div class="job-dept">{{ job.company_name || 'Gordon College Partner' }}</div>
+                <button
+                  v-if="job.employer_id"
+                  class="job-company-btn"
+                  @click="openCompanyProfile(job.employer_id)"
+                >
+                  {{ job.company_name || 'Gordon College Partner' }}
+                </button>
+                <div v-else class="job-dept">{{ job.company_name || 'Gordon College Partner' }}</div>
                 <div class="job-tags">
                   <span v-for="skill in (job.required_skills || []).slice(0, 3)" :key="skill" class="jtag">{{ skill }}</span>
                 </div>
@@ -160,6 +167,11 @@ const getMatchClass = (score) => {
 const handleLogout = async () => {
   await authStore.logout()
   router.push('/login')
+}
+
+const openCompanyProfile = (employerId) => {
+  if (!employerId) return
+  router.push(`/companies/${employerId}`)
 }
 
 const applyForJob = async (job) => {
@@ -299,6 +311,17 @@ onMounted(() => {
 .pct-low { background: #F1EFE8; color: var(--gc-muted); }
 .pct-mid { background: #C0DD97; color: #27500A; }
 .pct-high { background: var(--gc-green); color: #fff; }
+
+.job-company-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--gc-green);
+  cursor: pointer;
+  text-align: left;
+}
 
 .dashboard-layout {
   display: grid;

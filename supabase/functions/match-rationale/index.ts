@@ -22,8 +22,8 @@ serve(async (req) => {
     // 1. Fetch student skills
     const { data: sp, error: spErr } = await supabase
       .from('student_profiles')
-      .select('skills, course, year_level')
-      .eq('id', student_id)
+      .select('skills, program, section')
+      .eq('user_id', student_id)
       .single()
     if (spErr) throw spErr
 
@@ -43,7 +43,7 @@ serve(async (req) => {
       .eq('job_id', job_id)
       .single()
 
-    const scorePercent = match?.score ? Math.round(match.score * 100) : null
+    const scorePercent = typeof match?.score === 'number' ? Math.round(match.score * 100) : null
 
     // 4. Ask Gemini to generate rationale
     const geminiRes = await fetch(
@@ -57,8 +57,8 @@ serve(async (req) => {
               text: `You are a career advisor for Gordon College students. Analyze how well this student matches the job.
 
 Student:
-- Course: ${sp.course ?? 'Not specified'}
-- Year Level: ${sp.year_level ?? 'Not specified'}
+- Program: ${sp.program ?? 'Not specified'}
+- Section: ${sp.section ?? 'Not specified'}
 - Skills: ${(sp.skills ?? []).join(', ') || 'None listed'}
 
 Job:

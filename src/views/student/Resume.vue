@@ -98,8 +98,9 @@ import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/api/supabase'
 import { computeMatchesForStudent } from '@/api/matching'
 import * as pdfjsLib from 'pdfjs-dist'
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -128,7 +129,8 @@ const handleLogout = async () => {
 
 const handleFileSelect = (event) => {
   const file = event.target.files[0]
-  if (file && file.type === 'application/pdf') {
+  const isPdf = file && (file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf'))
+  if (isPdf) {
     selectedFile.value = file
     uploadStatus.value = ''
     uploadSuccess.value = false
@@ -187,7 +189,11 @@ const uploadResume = async () => {
     if (data?.error) throw new Error('AI analysis failed: ' + data.error)
     if (!data?.skills?.length) throw new Error('AI could not extract skills from this resume. Try a different PDF.')
 
-    // Step 4 — Save to resumes table
+    extractedSkills.value = data.skills
+    achievements.value = data.achievements
+    aiSummary.value = data.summary
+    recruiterTip.value = data.recruiterTip
+
     uploadStep.value = 4
 
     await supabase
@@ -213,47 +219,49 @@ const uploadResume = async () => {
     lastResumeId = newResume?.id
     console.log('Resume saved with ID:', lastResumeId)
 
-    // Update skills on student profile
     const { error: skillsError } = await supabase
       .from('student_profiles')
       .update({ skills: data.skills })
       .eq('user_id', authStore.user.id)
     if (skillsError) throw new Error('Failed to save skills: ' + skillsError.message)
 
-    // Step 5 — Generate embedding
+    uploadStatus.value = 'Resume analyzed successfully. Computing job matches...'
+    uploadSuccess.value = true
+    uploading.value = false
+    uploadStep.value = 0
+
     uploadStep.value = 5
-    if (lastResumeId && extractedText) {
-      console.log('Calling embed-resume for ID:', lastResumeId)
-      console.log('Text length:', extractedText.length)
-      
-      const { data: embedData, error: embedError } = await supabase.functions.invoke('embed-resume', {
-        body: {
-          resumeId: lastResumeId,
-          text: extractedText
+    try {
+      if (lastResumeId && extractedText) {
+        const { data: embedData, error: embedError } = await supabase.functions.invoke('embed-resume', {
+          body: {
+            resumeId: lastResumeId,
+            text: extractedText
+          }
+        })
+
+        console.log('Embed response:', { embedData, embedError })
+
+        if (embedError) {
+          console.error('Embed error:', embedError)
+        } else {
+          console.log('Embed success:', embedData)
         }
-      })
-      
-      console.log('Embed response:', { embedData, embedError })
-      
-      if (embedError) {
-        console.error('Embed error:', embedError)
       } else {
-        console.log('Embed success:', embedData)
+        console.warn('Skipping embed - missing resumeId or text')
       }
-    } else {
-      console.warn('Skipping embed - missing resumeId or text')
+    } catch (embedError) {
+      console.error('Embed error:', embedError)
     }
 
-    // Step 6 — Compute match scores
-    await computeMatchesForStudent(authStore.user.id)
+    try {
+      await computeMatchesForStudent(authStore.user.id)
+      uploadStatus.value = 'Resume analyzed successfully. Job match scores are ready.'
+    } catch (matchError) {
+      console.error('Match computation error:', matchError)
+      uploadStatus.value = 'Resume analyzed successfully. Job matches will update shortly.'
+    }
 
-    // Update UI
-    extractedSkills.value = data.skills
-    achievements.value = data.achievements
-    aiSummary.value = data.summary
-    recruiterTip.value = data.recruiterTip
-
-    uploadStatus.value = 'Resume analyzed successfully. Job match scores are ready.'
     uploadSuccess.value = true
   } catch (error) {
     console.error('Resume upload error:', error)

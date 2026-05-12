@@ -89,6 +89,13 @@
                 <div class="details-meta">{{ selectedApplicant.program }} {{ selectedApplicant.section }}</div>
                 <div class="details-date">Applied {{ formatDate(selectedApplicant.applied_at) }}</div>
               </div>
+              <button
+                class="profile-btn"
+                @click="$router.push(`/students/${selectedApplicant.student_id}`)"
+                v-if="selectedApplicant.student_id"
+              >
+                View public profile
+              </button>
             </div>
           </div>
 
@@ -380,8 +387,9 @@ const fetchData = async () => {
       
       const fullName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Student'
       
-      enrichedApps.push({
-        id: app.id,
+        enrichedApps.push({
+          id: app.id,
+        student_id: app.student_id,
         job_id: app.job_id,
         job_title: job?.title || 'Unknown Job',
         name: fullName,
@@ -631,6 +639,7 @@ onMounted(() => {
   display: flex;
   gap: 1rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .details-avatar {
@@ -658,6 +667,17 @@ onMounted(() => {
 .details-date {
   font-size: 0.7rem;
   color: #97C459;
+}
+
+.profile-btn {
+  margin-left: auto;
+  background: transparent;
+  color: var(--gc-green);
+  border: 1px solid var(--gc-green);
+  border-radius: 20px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.75rem;
+  cursor: pointer;
 }
 
 .details-section {
