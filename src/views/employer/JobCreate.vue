@@ -14,7 +14,6 @@
         <li class="active">⬡ Post a job</li>
         <li @click="$router.push('/employer/applicants')">⬡ Applicants</li>
         <li @click="$router.push('/employer/jobs')">⬡ Active listings</li>
-        <li @click="$router.push('/employer/hired')">⬡ Hired students</li>
         <div class="s-nav-label">Account</div>
         <li @click="$router.push('/employer/company')">⬡ Company profile</li>
         <li @click="$router.push('/employer/settings')">⬡ Settings</li>
