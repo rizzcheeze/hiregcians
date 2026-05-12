@@ -40,6 +40,20 @@
 
             <div class="form-row">
               <div class="form-section" style="margin-bottom:0">
+                <label class="form-label">Industry</label>
+                <select class="form-select" v-model="form.industry" @change="onIndustryChange">
+                  <option value="">Select industry (for skill suggestions)</option>
+                  <option value="Software Development">Software Development</option>
+                  <option value="Web & Mobile Development">Web & Mobile Development</option>
+                  <option value="IT Services & Consulting">IT Services & Consulting</option>
+                  <option value="Artificial Intelligence">Artificial Intelligence / ML</option>
+                  <option value="Cybersecurity">Cybersecurity</option>
+                  <option value="Cloud Computing">Cloud Computing & DevOps</option>
+                  <option value="Data Analytics">Data Analytics & BI</option>
+                  <option value="Game Development">Game Development</option>
+                </select>
+              </div>
+              <div class="form-section" style="margin-bottom:0">
                 <label class="form-label">Job type</label>
                 <select class="form-select" v-model="form.job_type">
                   <option value="">Select type</option>
@@ -49,6 +63,11 @@
                   <option value="full-time">Full-time</option>
                 </select>
               </div>
+            </div>
+
+            <hr class="divider" />
+
+            <div class="form-row">
               <div class="form-section" style="margin-bottom:0">
                 <label class="form-label">Work setup</label>
                 <select class="form-select" v-model="form.work_setup">
@@ -58,13 +77,8 @@
                   <option value="flexible">Flexible</option>
                 </select>
               </div>
-            </div>
-
-            <hr class="divider" />
-
-            <div class="form-row">
               <div class="form-section" style="margin-bottom:0">
-                <label class="form-label">Schedule / Shift</label>
+                <label class="form-label">Schedule</label>
                 <select v-model="form.schedule" class="form-select">
                   <option value="">Select schedule</option>
                   <option value="weekdays_morning">Weekdays - Morning (8AM - 12PM)</option>
@@ -82,12 +96,31 @@
             <hr class="divider" />
 
             <div class="form-section">
+              <label class="form-label">Number of slots</label>
+              <input class="form-input" type="number" v-model="form.slots" placeholder="e.g., 2" style="width:100px" />
+            </div>
+
+            <hr class="divider" />
+
+            <div class="form-section">
               <label class="form-label">Job description</label>
               <textarea class="form-textarea" v-model="form.description" rows="6" placeholder="Describe the role, responsibilities, and who should apply."></textarea>
             </div>
 
             <div class="form-section">
               <label class="form-label">Required skills <span>(used for AI matching)</span></label>
+              
+              <!-- Suggested skills based on industry -->
+              <div v-if="suggestedSkills.length" class="suggested-skills">
+                <label class="form-label" style="font-size:0.7rem; color:var(--gc-green-mid)">Suggested skills for {{ form.industry }}:</label>
+                <div class="skill-chips suggested">
+                  <span v-for="skill in suggestedSkills" :key="skill" class="skill-chip suggested" @click="addSkill(skill)">
+                    + {{ skill }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Selected skills -->
               <div class="skill-input-wrap">
                 <div class="skill-chips">
                   <span v-for="(skill, index) in skills" :key="index" class="skill-chip">
@@ -98,9 +131,9 @@
                 <input 
                   class="skill-input-ghost" 
                   v-model="skillInput" 
-                  @keydown.enter.prevent="addSkill"
-                  @keydown.tab.prevent="addSkill"
-                  placeholder="+ Add skill" 
+                  @keydown.enter.prevent="addCustomSkill"
+                  @keydown.tab.prevent="addCustomSkill"
+                  placeholder="+ Add custom skill" 
                 />
               </div>
             </div>
@@ -118,18 +151,17 @@
             </div>
             <div class="preview-desc">{{ form.description || 'Your role description preview will appear here.' }}</div>
 
+            <div class="skills-preview" v-if="skills.length">
+              <div class="preview-label">Required skills</div>
+              <div class="preview-skills">
+                <span v-for="skill in skills.slice(0, 8)" :key="skill" class="preview-skill">{{ skill }}</span>
+              </div>
+            </div>
+
             <div class="ai-preview-box">
               <div class="ai-preview-label">AI match estimate</div>
               <div class="ai-preview-body">
                 Based on your listed skills, approximately <strong style="color:var(--gc-green)">14 students</strong> on the platform have a match score above 70% for this role.
-              </div>
-            </div>
-
-            <div class="applicants-preview">
-              <div class="ap-label">Top predicted matches</div>
-              <div class="ap-row" v-for="(match, idx) in predictedMatches" :key="idx">
-                <span class="ap-name">{{ match.name }}</span>
-                <span class="ap-pct">{{ match.score }}%</span>
               </div>
             </div>
 
@@ -161,6 +193,7 @@ const skillInput = ref('')
 
 const form = ref({
   title: '',
+  industry: '',
   job_type: '',
   work_setup: '',
   schedule: '',
@@ -169,20 +202,34 @@ const form = ref({
   status: 'active'
 })
 
+// Industry-specific skill suggestions
+const industrySkills = {
+  'Software Development': ['JavaScript', 'Python', 'Java', 'C++', 'Git', 'Agile', 'REST APIs', 'SQL', 'Data Structures', 'OOP'],
+  'Web & Mobile Development': ['HTML/CSS', 'JavaScript', 'React', 'Vue.js', 'Angular', 'Node.js', 'Flutter', 'React Native', 'Tailwind', 'REST APIs'],
+  'IT Services & Consulting': ['Network Security', 'System Administration', 'ITIL', 'Cloud Computing', 'Customer Support', 'Troubleshooting', 'Documentation'],
+  'Artificial Intelligence': ['Python', 'TensorFlow', 'PyTorch', 'Machine Learning', 'Data Science', 'NLP', 'Computer Vision', 'Pandas', 'NumPy'],
+  'Cybersecurity': ['Network Security', 'Penetration Testing', 'Risk Assessment', 'Firewalls', 'Encryption', 'Security Audits', 'Compliance'],
+  'Cloud Computing': ['AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'Terraform', 'CI/CD', 'Linux', 'DevOps'],
+  'Data Analytics': ['SQL', 'Python', 'Tableau', 'Power BI', 'Excel', 'Data Visualization', 'Statistics', 'Pandas', 'ETL'],
+  'Game Development': ['C#', 'Unity', 'Unreal Engine', 'C++', '3D Modeling', 'Animation', 'Game Design', 'Shader Programming']
+}
+
+const suggestedSkills = computed(() => {
+  return industrySkills[form.value.industry] || []
+})
+
 const initials = computed(() => {
-  if (companyName.value) {
-    return companyName.value.charAt(0).toUpperCase()
-  }
+  if (companyName.value) return companyName.value.charAt(0).toUpperCase()
   return firstName.value.charAt(0).toUpperCase() || 'E'
 })
 
-const predictedMatches = ref([
-  { name: 'Allyana Espiridion', score: 94 },
-  { name: 'John David Cruz', score: 87 },
-  { name: 'Maria Santos', score: 82 }
-])
+const addSkill = (skill) => {
+  if (skill && !skills.value.includes(skill)) {
+    skills.value.push(skill)
+  }
+}
 
-const addSkill = () => {
+const addCustomSkill = () => {
   const skill = skillInput.value.trim()
   if (skill && !skills.value.includes(skill)) {
     skills.value.push(skill)
@@ -192,6 +239,10 @@ const addSkill = () => {
 
 const removeSkill = (index) => {
   skills.value.splice(index, 1)
+}
+
+const onIndustryChange = () => {
+  // Optional: Auto-add some suggested skills or just show them for manual addition
 }
 
 const handleLogout = async () => {
@@ -233,34 +284,7 @@ const createJob = async () => {
 
     const job = Array.isArray(data) ? data[0] : data
     if (job?.id) {
-      let embeddingGenerated = false
-
-      // Generate embedding for cosine similarity
-      try {
-        const { data: embedData, error: embedError } = await supabase.functions.invoke('embed-job', {
-          body: {
-            jobId: job.id,
-            title: form.value.title,
-            description: form.value.description,
-            skills: skills.value
-          }
-        })
-        if (embedError || embedData?.success === false) {
-          throw new Error(embedData?.error || embedError?.message || 'Failed to generate job embedding')
-        }
-        embeddingGenerated = true
-        console.log('Embedding generated for job')
-      } catch (embedError) {
-        console.error('Failed to generate embedding:', embedError)
-      }
-
-      if (embeddingGenerated) {
-        try {
-          await computeMatchesForJob(job.id)
-        } catch (matchError) {
-          console.error('Failed to compute cosine matches:', matchError)
-        }
-      }
+      await computeMatchesForJob(job.id)
     }
 
     alert('Job posted successfully!')
@@ -405,22 +429,18 @@ onMounted(() => {
   margin: 1rem 0;
 }
 
-.skill-input-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  border: 0.5px solid #C0DD97;
-  border-radius: 8px;
-  padding: 0.5rem;
-  background: #fff;
-  min-height: 44px;
-  align-items: center;
+.suggested-skills {
+  margin-bottom: 0.75rem;
 }
 
 .skill-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.skill-chips.suggested {
+  margin-bottom: 0.5rem;
 }
 
 .skill-chip {
@@ -434,10 +454,34 @@ onMounted(() => {
   gap: 4px;
 }
 
+.skill-chip.suggested {
+  background: #E8F0FF;
+  color: #2D5FC4;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.skill-chip.suggested:hover {
+  background: #2D5FC4;
+  color: #fff;
+}
+
 .skill-chip-x {
   font-size: 10px;
   cursor: pointer;
   color: var(--gc-green-mid);
+}
+
+.skill-input-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  border: 0.5px solid #C0DD97;
+  border-radius: 8px;
+  padding: 0.5rem;
+  background: #fff;
+  min-height: 44px;
+  align-items: center;
 }
 
 .skill-input-ghost {
@@ -508,6 +552,26 @@ onMounted(() => {
   margin-bottom: 0.85rem;
 }
 
+.skills-preview {
+  margin-bottom: 0.85rem;
+  padding-top: 0.5rem;
+  border-top: 0.5px solid #EAF3DE;
+}
+
+.preview-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.preview-skill {
+  font-size: 0.65rem;
+  background: var(--gc-green-light);
+  color: var(--gc-green);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
 .ai-preview-box {
   background: var(--gc-green-light);
   border-radius: 8px;
@@ -526,36 +590,6 @@ onMounted(() => {
   font-size: 0.72rem;
   color: var(--gc-muted);
   line-height: 1.5;
-}
-
-.applicants-preview {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 0.5px solid #EAF3DE;
-}
-
-.ap-label {
-  font-size: 0.7rem;
-  color: var(--gc-muted);
-  margin-bottom: 0.5rem;
-}
-
-.ap-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.3rem 0;
-}
-
-.ap-name {
-  font-size: 0.75rem;
-  color: var(--gc-dark);
-}
-
-.ap-pct {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--gc-green);
 }
 
 .submit-btn {
