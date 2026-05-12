@@ -270,8 +270,8 @@ const handlePhotoUpload = async (event) => {
     const publicUrl = data.publicUrl + '?t=' + Date.now()
 
     const { error: dbError } = await supabase
-      .from('student_profiles')
-      .update({ avatar_url: data.publicUrl })
+  .from('student_profiles')
+  .upsert({ user_id: authStore.user.id, avatar_url: data.publicUrl })
       .eq('user_id', authStore.user.id)
 
     if (dbError) throw dbError
