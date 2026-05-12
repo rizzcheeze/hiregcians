@@ -23,7 +23,6 @@
     </aside>
 
     <div class="applicants-container">
-      <!-- Job Selector -->
       <div class="job-selector">
         <select v-model="selectedJobId" class="job-select">
           <option value="all">All Jobs ({{ totalApplicants }})</option>
@@ -33,9 +32,8 @@
         </select>
       </div>
 
-      <!-- Three Column Layout -->
       <div class="applicants-layout">
-        <!-- Left Column - Applicants List -->
+        <!-- Left Column -->
         <div class="applicants-list">
           <div class="list-header">
             <div class="list-title">Applicants</div>
@@ -48,24 +46,25 @@
               <button class="stage-tab" :class="{ active: activeStage === 'rejected' }" @click="activeStage = 'rejected'">Rejected ({{ rejectedCount }})</button>
             </div>
           </div>
-          
+
           <div class="list-scroll">
             <div v-if="loading" class="loading-state">Loading applicants...</div>
             <div v-else-if="filteredApplicants.length === 0" class="empty-state">No applicants found</div>
             <div v-else>
-              <div 
-                v-for="applicant in filteredApplicants" 
-                :key="applicant.id" 
+              <div
+                v-for="applicant in filteredApplicants"
+                :key="applicant.id"
                 class="applicant-card"
                 :class="{ selected: selectedApplicant?.id === applicant.id }"
                 @click="selectApplicant(applicant)"
               >
                 <div class="applicant-avatar" :style="{ background: getAvatarColor(applicant.name) }">
-                  {{ getInitials(applicant.name) }}
+                  <img v-if="applicant.avatar_url" :src="applicant.avatar_url" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                  <span v-else>{{ getInitials(applicant.name) }}</span>
                 </div>
                 <div class="applicant-info">
                   <div class="applicant-name">{{ applicant.name }}</div>
-                  <div class="applicant-meta">{{ applicant.program }} {{ applicant.section }}</div>
+                  <div class="applicant-meta">{{ applicant.program }}{{ applicant.section ? ' · ' + applicant.section : '' }}</div>
                   <div class="applicant-job">{{ applicant.job_title }}</div>
                 </div>
                 <div class="applicant-score" :class="getScoreClass(applicant.match_score)">
@@ -76,26 +75,20 @@
           </div>
         </div>
 
-        <!-- Middle Column - Applicant Details -->
+        <!-- Middle Column -->
         <div class="applicant-details" v-if="selectedApplicant">
           <div class="details-header">
             <button class="back-btn" @click="selectedApplicant = null">← Back</button>
             <div class="details-profile">
               <div class="details-avatar" :style="{ background: getAvatarColor(selectedApplicant.name) }">
-                {{ getInitials(selectedApplicant.name) }}
+                <img v-if="selectedApplicant.avatar_url" :src="selectedApplicant.avatar_url" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                <span v-else>{{ getInitials(selectedApplicant.name) }}</span>
               </div>
               <div>
                 <div class="details-name">{{ selectedApplicant.name }}</div>
-                <div class="details-meta">{{ selectedApplicant.program }} {{ selectedApplicant.section }}</div>
+                <div class="details-meta">{{ selectedApplicant.program }}{{ selectedApplicant.section ? ' · ' + selectedApplicant.section : '' }}</div>
                 <div class="details-date">Applied {{ formatDate(selectedApplicant.applied_at) }}</div>
               </div>
-              <button
-                class="profile-btn"
-                @click="$router.push(`/students/${selectedApplicant.student_id}`)"
-                v-if="selectedApplicant.student_id"
-              >
-                View public profile
-              </button>
             </div>
           </div>
 
@@ -126,9 +119,12 @@
           <div class="details-section">
             <div class="section-title">Required Skills</div>
             <div class="skills-list">
-              <span v-for="skill in selectedApplicant.required_skills" :key="skill" class="skill-badge required" :class="{ matched: selectedApplicant.skills?.includes(skill) }">
-                {{ skill }}
-              </span>
+              <span
+                v-for="skill in selectedApplicant.required_skills"
+                :key="skill"
+                class="skill-badge required"
+                :class="{ matched: selectedApplicant.skills?.includes(skill) }"
+              >{{ skill }}</span>
               <span v-if="!selectedApplicant.required_skills?.length" class="no-data">No required skills</span>
             </div>
           </div>
@@ -138,7 +134,7 @@
             <div v-if="selectedApplicant.experience?.length">
               <div v-for="(exp, idx) in selectedApplicant.experience" :key="idx" class="experience-item">
                 <div class="exp-title">{{ exp.title || 'Experience' }}</div>
-                <div class="exp-org">{{ exp.organization }} {{ exp.year ? '(' + exp.year + ')' : '' }}</div>
+                <div class="exp-org">{{ exp.organization }}{{ exp.year ? ' (' + exp.year + ')' : '' }}</div>
                 <div class="exp-desc">{{ exp.description }}</div>
               </div>
             </div>
@@ -150,7 +146,7 @@
           <div class="empty-detail">Select an applicant to view details</div>
         </div>
 
-        <!-- Right Column - Actions -->
+        <!-- Right Column -->
         <div class="applicant-actions" v-if="selectedApplicant">
           <div class="actions-title">Application Stage</div>
           <div class="status-buttons">
@@ -202,7 +198,6 @@ const initials = computed(() => {
 })
 
 const totalApplicants = computed(() => applicants.value.length)
-
 const pendingCount = computed(() => applicants.value.filter(a => a.status === 'pending').length)
 const reviewCount = computed(() => applicants.value.filter(a => a.status === 'review').length)
 const interviewCount = computed(() => applicants.value.filter(a => a.status === 'interview').length)
@@ -235,8 +230,7 @@ const getInitials = (name) => {
 
 const getAvatarColor = (name) => {
   const colors = ['#3B6D11', '#639922', '#97C459', '#5F5E5A', '#1a2e0a']
-  const index = (name?.length || 0) % colors.length
-  return colors[index]
+  return colors[(name?.length || 0) % colors.length]
 }
 
 const getScoreClass = (score) => {
@@ -248,13 +242,10 @@ const getScoreClass = (score) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return 'Recently'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const toggleSidebar = () => {
-  sidebarOpen.value = !sidebarOpen.value
-}
+const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 
 const handleLogout = async () => {
   await authStore.logout()
@@ -268,24 +259,16 @@ const selectApplicant = (applicant) => {
 
 const updateStatus = async (status) => {
   if (!selectedApplicant.value) return
-  
   try {
     const { error } = await supabase
       .from('applications')
       .update({ status, reviewed_at: new Date().toISOString() })
       .eq('id', selectedApplicant.value.id)
-    
     if (error) throw error
-    
-    if (status === 'rejected') {
-      console.log(`Rejection recorded for ${selectedApplicant.value.name}`)
-    }
-    
     const index = applicants.value.findIndex(a => a.id === selectedApplicant.value.id)
     if (index !== -1) applicants.value[index].status = status
-    
-    alert(`Application marked as ${status}`)
-    await fetchData()
+    selectedApplicant.value.status = status
+    alert('Application marked as ' + status)
   } catch (error) {
     console.error('Error updating status:', error)
     alert('Failed to update status')
@@ -294,18 +277,14 @@ const updateStatus = async (status) => {
 
 const saveNote = async () => {
   if (!selectedApplicant.value) return
-  
   try {
     const { error } = await supabase
       .from('applications')
       .update({ employer_notes: applicantNote.value })
       .eq('id', selectedApplicant.value.id)
-    
     if (error) throw error
-    
     const index = applicants.value.findIndex(a => a.id === selectedApplicant.value.id)
     if (index !== -1) applicants.value[index].employer_notes = applicantNote.value
-    
     alert('Note saved')
   } catch (error) {
     console.error('Error saving note:', error)
@@ -314,9 +293,7 @@ const saveNote = async () => {
 }
 
 watch(selectedApplicant, (newVal) => {
-  if (newVal) {
-    applicantNote.value = newVal.employer_notes || ''
-  }
+  if (newVal) applicantNote.value = newVal.employer_notes || ''
 })
 
 const fetchData = async () => {
@@ -327,7 +304,7 @@ const fetchData = async () => {
       .select('company_name')
       .eq('user_id', authStore.user.id)
       .maybeSingle()
-    
+
     companyName.value = profile?.company_name || ''
     firstName.value = authStore.profile?.first_name || ''
 
@@ -335,13 +312,9 @@ const fetchData = async () => {
       .from('jobs')
       .select('id, title, required_skills')
       .eq('employer_id', authStore.user.id)
-    
-    jobs.value = employerJobs || []
 
-    if (jobs.value.length === 0) {
-      loading.value = false
-      return
-    }
+    jobs.value = employerJobs || []
+    if (jobs.value.length === 0) { loading.value = false; return }
 
     const jobIds = jobs.value.map(j => j.id)
 
@@ -351,63 +324,52 @@ const fetchData = async () => {
       .in('job_id', jobIds)
       .order('applied_at', { ascending: false })
 
-    if (!apps || apps.length === 0) {
-      loading.value = false
-      return
-    }
+    if (!apps || apps.length === 0) { loading.value = false; return }
 
     const studentIds = [...new Set(apps.map(a => a.student_id))]
-    
-    const { data: userProfiles } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name')
-      .in('id', studentIds)
-    
-    const { data: studentProfiles } = await supabase
-      .from('student_profiles')
-      .select('user_id, program, section, about, skills, experience')
-      .in('user_id', studentIds)
-    
-    const userMap = new Map(userProfiles?.map(p => [p.id, p]) || [])
-    const studentMap = new Map(studentProfiles?.map(s => [s.user_id, s]) || [])
-    
-    const enrichedApps = []
-    
-    for (const app of apps) {
+
+    // fetch all in parallel - no per-row queries
+    const [
+      { data: userProfiles },
+      { data: studentProfiles },
+      { data: matchScores }
+    ] = await Promise.all([
+      supabase.from('profiles').select('id, first_name, last_name').in('id', studentIds),
+      supabase.from('student_profiles').select('user_id, program, section, about, skills, experience, avatar_url').in('user_id', studentIds),
+      supabase.from('match_scores').select('student_id, job_id, score, rationale').in('job_id', jobIds).in('student_id', studentIds)
+    ])
+
+    const userMap = new Map((userProfiles || []).map(p => [p.id, p]))
+    const studentMap = new Map((studentProfiles || []).map(s => [s.user_id, s]))
+    const matchMap = new Map((matchScores || []).map(m => [m.student_id + '_' + m.job_id, m]))
+
+    applicants.value = apps.map(app => {
       const job = jobs.value.find(j => j.id === app.job_id)
       const user = userMap.get(app.student_id)
       const student = studentMap.get(app.student_id)
-      
-      const { data: match } = await supabase
-        .from('match_scores')
-        .select('score, rationale')
-        .eq('student_id', app.student_id)
-        .eq('job_id', app.job_id)
-        .maybeSingle()
-      
-      const fullName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Student'
-      
-        enrichedApps.push({
-          id: app.id,
+      const match = matchMap.get(app.student_id + '_' + app.job_id)
+      const fullName = user ? (user.first_name + ' ' + user.last_name).trim() : 'Student'
+
+      return {
+        id: app.id,
         student_id: app.student_id,
         job_id: app.job_id,
         job_title: job?.title || 'Unknown Job',
         name: fullName,
         program: student?.program || 'Not specified',
         section: student?.section || '',
-        about: student?.about || 'No bio provided',
+        about: student?.about || '',
         skills: student?.skills || [],
         experience: student?.experience || [],
+        avatar_url: student?.avatar_url || null,
         status: app.status,
         applied_at: app.applied_at,
         employer_notes: app.employer_notes || '',
         match_score: match?.score || 0,
         match_rationale: match?.rationale || 'No match rationale available',
         required_skills: job?.required_skills || []
-      })
-    }
-    
-    applicants.value = enrichedApps
+      }
+    })
   } catch (error) {
     console.error('Error fetching data:', error)
   } finally {
@@ -415,517 +377,94 @@ const fetchData = async () => {
   }
 }
 
-onMounted(() => {
-  fetchData()
-})
+onMounted(() => { fetchData() })
 </script>
 
 <style scoped>
-.emp-badge {
-  font-size: 0.65rem;
-  background: rgba(192,221,151,0.15);
-  color: #97C459;
-  padding: 2px 8px;
-  border-radius: 20px;
-  margin-top: 0.35rem;
-  display: inline-block;
-}
+.emp-badge { font-size: 0.65rem; background: rgba(192,221,151,0.15); color: #97C459; padding: 2px 8px; border-radius: 20px; margin-top: 0.35rem; display: inline-block; }
+.s-dept { font-size: 0.72rem; color: #97C459; opacity: 0.7; }
+.badge { background: var(--gc-green); color: #fff; font-size: 0.62rem; padding: 1px 6px; border-radius: 10px; margin-left: auto; }
+
+.applicants-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--gc-cream); }
+.job-selector { background: #fff; padding: 1rem 1.5rem; border-bottom: 1px solid #C0DD97; }
+.job-select { width: 100%; max-width: 300px; padding: 0.5rem 0.75rem; border: 1px solid #C0DD97; border-radius: 8px; font-size: 0.85rem; background: #fff; }
+
+.applicants-layout { display: grid; grid-template-columns: 320px 1fr 280px; gap: 0; height: calc(100vh - 70px); overflow: hidden; }
+
+.applicants-list { background: #fff; border-right: 1px solid #C0DD97; display: flex; flex-direction: column; overflow: hidden; }
+.list-header { padding: 1rem; border-bottom: 1px solid #EAF3DE; flex-shrink: 0; }
+.list-title { font-family: 'DM Serif Display', serif; font-size: 1.1rem; margin-bottom: 0.75rem; }
+.stage-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.stage-tab { font-size: 0.7rem; padding: 0.3rem 0.6rem; border-radius: 20px; border: none; background: #F1EFE8; color: var(--gc-muted); cursor: pointer; transition: all 0.2s; }
+.stage-tab.active { background: var(--gc-green); color: #fff; }
+
+.list-scroll { flex: 1; overflow-y: auto; padding: 0.5rem; }
+.applicant-card { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 10px; cursor: pointer; transition: background 0.2s; }
+.applicant-card:hover { background: #FAFAF7; }
+.applicant-card.selected { background: var(--gc-green-light); border-left: 3px solid var(--gc-green); }
+.applicant-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 500; flex-shrink: 0; overflow: hidden; }
+.applicant-info { flex: 1; min-width: 0; }
+.applicant-name { font-weight: 500; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.applicant-meta { font-size: 0.65rem; color: var(--gc-muted); }
+.applicant-job { font-size: 0.7rem; color: var(--gc-green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.applicant-score { font-size: 0.75rem; font-weight: 500; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.score-high { background: var(--gc-green); color: #fff; }
+.score-mid { background: #C0DD97; color: #27500A; }
+.score-low { background: #F1EFE8; color: var(--gc-muted); }
+
+.applicant-details { background: #fff; padding: 1.25rem; overflow-y: auto; }
+.applicant-details.empty { display: flex; align-items: center; justify-content: center; }
+.details-header { margin-bottom: 1.25rem; }
+.back-btn { display: none; background: none; border: none; color: var(--gc-muted); cursor: pointer; margin-bottom: 0.75rem; font-size: 0.8rem; }
+.details-profile { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.details-avatar { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.3rem; flex-shrink: 0; overflow: hidden; }
+.details-name { font-family: 'DM Serif Display', serif; font-size: 1.2rem; }
+.details-meta { font-size: 0.75rem; color: var(--gc-muted); }
+.details-date { font-size: 0.7rem; color: #97C459; }
+
+.details-section { margin-bottom: 1.25rem; }
+.section-title { font-size: 0.75rem; font-weight: 600; color: var(--gc-dark); margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid #EAF3DE; }
+.section-content { font-size: 0.85rem; color: var(--gc-muted); line-height: 1.5; }
+
+.match-card { background: var(--gc-green-light); border-radius: 10px; padding: 0.85rem; }
+.match-value { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--gc-green); }
+.match-bar { background: #C0DD97; border-radius: 4px; height: 6px; margin: 0.5rem 0; }
+.match-fill { background: var(--gc-green); border-radius: 4px; height: 6px; }
+.match-note { font-size: 0.7rem; color: var(--gc-green); }
+
+.skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.skill-badge { font-size: 0.7rem; padding: 4px 10px; background: var(--gc-green-light); color: var(--gc-green); border-radius: 20px; }
+.skill-badge.required { background: #F1EFE8; color: var(--gc-muted); }
+.skill-badge.matched { background: var(--gc-green); color: #fff; }
+
+.experience-item { margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #EAF3DE; }
+.exp-title { font-weight: 500; font-size: 0.85rem; }
+.exp-org { font-size: 0.7rem; color: #97C459; }
+.exp-desc { font-size: 0.75rem; color: var(--gc-muted); margin-top: 0.25rem; }
+.no-data { font-size: 0.8rem; color: #B4B2A9; font-style: italic; }
+
+.applicant-actions { background: #fff; border-left: 1px solid #C0DD97; padding: 1.25rem; overflow-y: auto; }
+.applicant-actions.empty { display: flex; align-items: center; justify-content: center; }
+.actions-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.75rem; }
+.status-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
+.status-btn { padding: 0.6rem; background: #fff; border: 1px solid #C0DD97; border-radius: 8px; font-size: 0.8rem; cursor: pointer; text-align: left; transition: all 0.2s; }
+.status-btn:hover { background: #FAFAF7; }
+.status-btn.active { background: var(--gc-green); color: #fff; border-color: var(--gc-green); }
+.status-btn.reject.active { background: #B03030; border-color: #B03030; }
+.divider { height: 1px; background: #EAF3DE; margin: 1rem 0; }
+.notes-input { width: 100%; min-height: 100px; padding: 0.6rem; border: 1px solid #C0DD97; border-radius: 8px; font-size: 0.8rem; font-family: inherit; resize: vertical; }
+.save-btn { margin-top: 0.75rem; padding: 0.5rem 1rem; background: var(--gc-green); color: #fff; border: none; border-radius: 24px; font-size: 0.75rem; cursor: pointer; }
+
+.empty-detail, .loading-state, .empty-state { text-align: center; padding: 2rem; color: var(--gc-muted); }
 
-.s-dept {
-  font-size: 0.72rem;
-  color: #97C459;
-  opacity: 0.7;
-}
-
-.badge {
-  background: var(--gc-green);
-  color: #fff;
-  font-size: 0.62rem;
-  padding: 1px 6px;
-  border-radius: 10px;
-  margin-left: auto;
-}
-
-.applicants-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--gc-cream);
-}
-
-.job-selector {
-  background: #fff;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #C0DD97;
-}
-
-.job-select {
-  width: 100%;
-  max-width: 300px;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #C0DD97;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  background: #fff;
-}
-
-.applicants-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr 280px;
-  gap: 0;
-  height: calc(100vh - 70px);
-  overflow: hidden;
-}
-
-/* Left Column - Applicants List */
-.applicants-list {
-  background: #fff;
-  border-right: 1px solid #C0DD97;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.list-header {
-  padding: 1rem;
-  border-bottom: 1px solid #EAF3DE;
-  flex-shrink: 0;
-}
-
-.list-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.1rem;
-  margin-bottom: 0.75rem;
-}
-
-.stage-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-.stage-tab {
-  font-size: 0.7rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 20px;
-  border: none;
-  background: #F1EFE8;
-  color: var(--gc-muted);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.stage-tab.active {
-  background: var(--gc-green);
-  color: #fff;
-}
-
-.list-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.5rem;
-}
-
-.applicant-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.applicant-card:hover {
-  background: #FAFAF7;
-}
-
-.applicant-card.selected {
-  background: var(--gc-green-light);
-  border-left: 3px solid var(--gc-green);
-}
-
-.applicant-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.applicant-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.applicant-name {
-  font-weight: 500;
-  font-size: 0.85rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.applicant-meta {
-  font-size: 0.65rem;
-  color: var(--gc-muted);
-}
-
-.applicant-job {
-  font-size: 0.7rem;
-  color: var(--gc-green);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.applicant-score {
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 20px;
-  white-space: nowrap;
-}
-
-.score-high {
-  background: var(--gc-green);
-  color: #fff;
-}
-
-.score-mid {
-  background: #C0DD97;
-  color: #27500A;
-}
-
-.score-low {
-  background: #F1EFE8;
-  color: var(--gc-muted);
-}
-
-/* Middle Column - Details */
-.applicant-details {
-  background: #fff;
-  padding: 1.25rem;
-  overflow-y: auto;
-}
-
-.applicant-details.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.details-header {
-  margin-bottom: 1.25rem;
-}
-
-.back-btn {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--gc-muted);
-  cursor: pointer;
-  margin-bottom: 0.75rem;
-  font-size: 0.8rem;
-}
-
-.details-profile {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.details-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 1.3rem;
-  flex-shrink: 0;
-}
-
-.details-name {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.2rem;
-}
-
-.details-meta {
-  font-size: 0.75rem;
-  color: var(--gc-muted);
-}
-
-.details-date {
-  font-size: 0.7rem;
-  color: #97C459;
-}
-
-.profile-btn {
-  margin-left: auto;
-  background: transparent;
-  color: var(--gc-green);
-  border: 1px solid var(--gc-green);
-  border-radius: 20px;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.details-section {
-  margin-bottom: 1.25rem;
-}
-
-.section-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--gc-dark);
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.25rem;
-  border-bottom: 1px solid #EAF3DE;
-}
-
-.section-content {
-  font-size: 0.85rem;
-  color: var(--gc-muted);
-  line-height: 1.5;
-}
-
-.match-card {
-  background: var(--gc-green-light);
-  border-radius: 10px;
-  padding: 0.85rem;
-}
-
-.match-value {
-  font-family: 'DM Serif Display', serif;
-  font-size: 2rem;
-  color: var(--gc-green);
-}
-
-.match-bar {
-  background: #C0DD97;
-  border-radius: 4px;
-  height: 6px;
-  margin: 0.5rem 0;
-}
-
-.match-fill {
-  background: var(--gc-green);
-  border-radius: 4px;
-  height: 6px;
-}
-
-.match-note {
-  font-size: 0.7rem;
-  color: var(--gc-green);
-}
-
-.skills-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.skill-badge {
-  font-size: 0.7rem;
-  padding: 4px 10px;
-  background: var(--gc-green-light);
-  color: var(--gc-green);
-  border-radius: 20px;
-}
-
-.skill-badge.required {
-  background: #F1EFE8;
-  color: var(--gc-muted);
-}
-
-.skill-badge.matched {
-  background: var(--gc-green);
-  color: #fff;
-}
-
-.experience-item {
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #EAF3DE;
-}
-
-.exp-title {
-  font-weight: 500;
-  font-size: 0.85rem;
-}
-
-.exp-org {
-  font-size: 0.7rem;
-  color: #97C459;
-}
-
-.exp-desc {
-  font-size: 0.75rem;
-  color: var(--gc-muted);
-  margin-top: 0.25rem;
-}
-
-.no-data {
-  font-size: 0.8rem;
-  color: #B4B2A9;
-  font-style: italic;
-}
-
-/* Right Column - Actions */
-.applicant-actions {
-  background: #fff;
-  border-left: 1px solid #C0DD97;
-  padding: 1.25rem;
-  overflow-y: auto;
-}
-
-.applicant-actions.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.actions-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-}
-
-.status-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.status-btn {
-  padding: 0.6rem;
-  background: #fff;
-  border: 1px solid #C0DD97;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.2s;
-}
-
-.status-btn:hover {
-  background: #FAFAF7;
-}
-
-.status-btn.active {
-  background: var(--gc-green);
-  color: #fff;
-  border-color: var(--gc-green);
-}
-
-.status-btn.reject.active {
-  background: #B03030;
-  border-color: #B03030;
-}
-
-.divider {
-  height: 1px;
-  background: #EAF3DE;
-  margin: 1rem 0;
-}
-
-.notes-input {
-  width: 100%;
-  min-height: 100px;
-  padding: 0.6rem;
-  border: 1px solid #C0DD97;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.save-btn {
-  margin-top: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: var(--gc-green);
-  color: #fff;
-  border: none;
-  border-radius: 24px;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.empty-detail, .loading-state, .empty-state {
-  text-align: center;
-  padding: 2rem;
-  color: var(--gc-muted);
-}
-
-/* Mobile Responsive */
 @media (max-width: 900px) {
-  .applicants-layout {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-  
-  .applicants-list, .applicant-details, .applicant-actions {
-    border-right: none;
-    border-bottom: 1px solid #C0DD97;
-  }
-  
-  .back-btn {
-    display: inline-block;
-  }
-  
-  .sidebar-toggle {
-    display: flex;
-    position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    background: var(--gc-green);
-    color: white;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 101;
-    font-size: 24px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-  }
-  
-  .sidebar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    top: auto;
-    height: auto;
-    max-height: 80vh;
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
-    z-index: 100;
-  }
-  
-  .sidebar.open {
-    transform: translateY(0);
-  }
+  .applicants-layout { grid-template-columns: 1fr; height: auto; }
+  .applicants-list, .applicant-details, .applicant-actions { border-right: none; border-bottom: 1px solid #C0DD97; }
+  .back-btn { display: inline-block; }
+  .sidebar-toggle { display: flex; position: fixed; bottom: 1rem; right: 1rem; background: var(--gc-green); color: white; width: 50px; height: 50px; border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; z-index: 101; font-size: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+  .sidebar { position: fixed; bottom: 0; left: 0; right: 0; top: auto; height: auto; max-height: 80vh; transform: translateY(100%); transition: transform 0.3s ease; z-index: 100; }
+  .sidebar.open { transform: translateY(0); }
 }
-
-.sidebar-toggle {
-  display: none;
-}
-
-@media (min-width: 901px) {
-  .sidebar-toggle {
-    display: none;
-  }
-}
+.sidebar-toggle { display: none; }
+@media (min-width: 901px) { .sidebar-toggle { display: none; } }
 </style>
