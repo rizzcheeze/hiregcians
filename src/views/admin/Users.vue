@@ -243,7 +243,7 @@ const fetchUsers = async () => {
       .select(`
         id, first_name, last_name, email, role, created_at,
         student_profiles(program, section, about, skills, experience, avatar_url),
-        employer_profiles(company_name, industry, location, about)
+        employer_profiles(company_name, industry, location)
       `)
       .order('created_at', { ascending: false })
 
@@ -263,7 +263,7 @@ const fetchUsers = async () => {
         // student
         program: sp?.program || '',
         section: sp?.section || '',
-        about: sp?.about || ep?.about || '',
+        about: sp?.about || '',
         skills: sp?.skills || [],
         experience: sp?.experience || [],
         // employer
