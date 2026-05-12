@@ -120,16 +120,6 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'n
 const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
 const handleLogout = async () => { await authStore.logout(); router.push('/') }
 
-const fetchProfiles = async () => {
-  const withEmail = await supabase
-    .from('profiles')
-    .select('id, first_name, last_name, email, role, created_at')
-    .order('created_at', { ascending: false })
-
-  if (!withEmail.error) return withEmail.data || []
-  throw new Error(`profiles: ${withEmail.error.message}`)
-}
-
 const deleteUser = async (user) => {
   if (!confirm(`Delete ${user.name}? This cannot be undone.`)) return
   try {
@@ -147,38 +137,32 @@ const fetchUsers = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const profiles = await fetchProfiles()
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select(`
+        id, first_name, last_name, email, role, created_at,
+        student_profiles(program),
+        employer_profiles(company_name)
+      `)
+      .order('created_at', { ascending: false })
 
-    // Enrich with program/company
-    const enriched = await Promise.all((profiles || []).map(async (profile) => {
-      let programOrCompany = '—'
-      if (profile.role === 'student') {
-        const { data: sp, error: studentError } = await supabase
-          .from('student_profiles').select('program').eq('user_id', profile.id).maybeSingle()
-        if (studentError) throw new Error(`student_profiles: ${studentError.message}`)
-        programOrCompany = sp?.program || '—'
-      } else if (profile.role === 'employer') {
-        const { data: ep, error: employerError } = await supabase
-          .from('employer_profiles').select('company_name').eq('user_id', profile.id).maybeSingle()
-        if (employerError) throw new Error(`employer_profiles: ${employerError.message}`)
-        programOrCompany = ep?.company_name || '—'
-      }
+    if (error) throw error
 
-      return {
-        id: profile.id,
-        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
-        email: profile.email || '',
-        role: profile.role,
-        programOrCompany,
-        created_at: profile.created_at,
-      }
+    users.value = (profiles || []).map(profile => ({
+      id: profile.id,
+      name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
+      email: profile.email || '',
+      role: profile.role,
+      programOrCompany:
+        profile.student_profiles?.[0]?.program ||
+        profile.employer_profiles?.[0]?.company_name ||
+        '—',
+      created_at: profile.created_at,
     }))
-
-    users.value = enriched
   } catch (err) {
     console.error('Error fetching users:', err)
     users.value = []
-    errorMessage.value = `Failed to load users: ${err.message || 'Unknown Supabase error'}`
+    errorMessage.value = `Failed to load users: ${err.message || 'Unknown error'}`
   } finally {
     loading.value = false
   }
