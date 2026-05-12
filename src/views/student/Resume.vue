@@ -144,14 +144,28 @@ const extractTextFromPDF = async (file) => {
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
   let fullText = ''
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i)
-    const textContent = await page.getTextContent()
-    fullText += textContent.items.map(item => item.str).join(' ') + '\n'
+  const CHUNK_SIZE = 3
+  for (let i = 1; i <= pdf.numPages; i += CHUNK_SIZE) {
+    const end = Math.min(i + CHUNK_SIZE - 1, pdf.numPages)
+    const pagePromises = []
+
+    for (let p = i; p <= end; p++) {
+      pagePromises.push(
+        pdf.getPage(p)
+          .then(page => page.getTextContent())
+          .then(tc => tc.items.map(item => item.str).join(' ') + '\n')
+      )
+    }
+
+    const chunkTexts = await Promise.all(pagePromises)
+    fullText += chunkTexts.join('')
+
+    // Yield to browser between chunks
+    await new Promise(r => setTimeout(r, 0))
   }
+
   return fullText.trim()
 }
-
 const uploadResume = async () => {
   if (!selectedFile.value) {
     uploadStatus.value = 'Please select a PDF file first'
