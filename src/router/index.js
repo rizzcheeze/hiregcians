@@ -75,12 +75,7 @@ const routes = [
     component: () => import('@/views/student/Profile.vue'),
     meta: { requiresAuth: true, role: 'student' }
   },
-  {
-    path: '/student/public-profile',
-    name: 'StudentPublicProfile',
-    component: () => import('@/views/public/StudentProfile.vue'),
-    meta: { requiresAuth: true, role: 'student', showShell: false }
-  },
+
   {
     path: '/student/resume',
     name: 'StudentResume',

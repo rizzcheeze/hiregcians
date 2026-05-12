@@ -5,7 +5,7 @@
       <div class="nav-links">
         <a href="#" @click.prevent="$router.push('/about')">About</a>
         <button class="btn-outline" @click="$router.push('/login')">Log in</button>
-        <button class="btn-primary" @click="$router.push('/register')">Sign up free</button>
+        <button class="btn-primary" @click="$router.push('/register')">Sign up</button>
       </div>
     </nav>
 
