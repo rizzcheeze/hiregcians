@@ -48,7 +48,6 @@
             <div v-if="uploadStatus && !uploading" class="upload-status" :class="{ 'status-success': uploadSuccess, 'status-error': !uploadSuccess }">
               {{ uploadStatus }}
             </div>
-            <!-- Step indicator while uploading -->
             <div v-if="uploading" class="upload-steps">
               <div class="step" :class="{ active: uploadStep >= 1, done: uploadStep > 1 }">1. Uploading file</div>
               <div class="step" :class="{ active: uploadStep >= 2, done: uploadStep > 2 }">2. Reading PDF</div>
@@ -119,8 +118,8 @@ const section = ref('')
 let lastResumeId = null
 
 const firstName = computed(() => authStore.profile?.first_name || '')
-const lastName  = computed(() => authStore.profile?.last_name || '')
-const initials  = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
+const lastName = computed(() => authStore.profile?.last_name || '')
+const initials = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
 
 const handleLogout = async () => {
   await authStore.logout()
@@ -163,7 +162,7 @@ const uploadResume = async () => {
   uploadSuccess.value = false
 
   try {
-    // Step 1 — Upload file to storage (order fixed: upload first)
+    // Step 1 — Upload file to storage
     uploadStep.value = 1
     const fileExt = selectedFile.value.name.split('.').pop()
     const fileName = `${authStore.user.id}/${Date.now()}.${fileExt}`
@@ -188,17 +187,15 @@ const uploadResume = async () => {
     if (data?.error) throw new Error('AI analysis failed: ' + data.error)
     if (!data?.skills?.length) throw new Error('AI could not extract skills from this resume. Try a different PDF.')
 
-    // Step 4 — Save to resumes table + update student_profiles.skills
+    // Step 4 — Save to resumes table
     uploadStep.value = 4
 
-    // Deactivate old resumes
     await supabase
       .from('resumes')
       .update({ is_active: false })
       .eq('student_id', authStore.user.id)
       .eq('is_active', true)
 
-    // Insert new resume record
     const { data: resumeData, error: saveError } = await supabase.from('resumes').insert({
       student_id: authStore.user.id,
       file_url: resumeUrl,
@@ -214,6 +211,7 @@ const uploadResume = async () => {
 
     const newResume = Array.isArray(resumeData) ? resumeData[0] : resumeData
     lastResumeId = newResume?.id
+    console.log('Resume saved with ID:', lastResumeId)
 
     // Update skills on student profile
     const { error: skillsError } = await supabase
@@ -222,37 +220,34 @@ const uploadResume = async () => {
       .eq('user_id', authStore.user.id)
     if (skillsError) throw new Error('Failed to save skills: ' + skillsError.message)
 
-    // Verify skills were actually saved before computing matches
-    const { data: verifyProfile } = await supabase
-      .from('student_profiles')
-      .select('skills')
-      .eq('user_id', authStore.user.id)
-      .maybeSingle()
-    if (!verifyProfile?.skills?.length) {
-      throw new Error('Skills were not saved correctly. Please try uploading again.')
-    }
-
-    // Step 5 — Generate embedding for cosine similarity
+    // Step 5 — Generate embedding
     uploadStep.value = 5
     if (lastResumeId && extractedText) {
-      try {
-        await supabase.functions.invoke('embed-resume', {
-          body: {
-            resumeId: lastResumeId,
-            text: extractedText
-          }
-        })
-        console.log('Embedding generated for resume')
-      } catch (embedError) {
-        console.error('Failed to generate embedding:', embedError)
+      console.log('Calling embed-resume for ID:', lastResumeId)
+      console.log('Text length:', extractedText.length)
+      
+      const { data: embedData, error: embedError } = await supabase.functions.invoke('embed-resume', {
+        body: {
+          resumeId: lastResumeId,
+          text: extractedText
+        }
+      })
+      
+      console.log('Embed response:', { embedData, embedError })
+      
+      if (embedError) {
+        console.error('Embed error:', embedError)
+      } else {
+        console.log('Embed success:', embedData)
       }
+    } else {
+      console.warn('Skipping embed - missing resumeId or text')
     }
 
     // Step 6 — Compute match scores
-    uploadStep.value = 5 // Keep at 5 for display
     await computeMatchesForStudent(authStore.user.id)
 
-    // Done — update UI
+    // Update UI
     extractedSkills.value = data.skills
     achievements.value = data.achievements
     aiSummary.value = data.summary
@@ -325,13 +320,10 @@ onMounted(() => { fetchExistingResume() })
 .upload-status { margin-top: 0.75rem; font-size: 0.75rem; padding: 0.5rem; border-radius: 8px; }
 .status-success { background: var(--gc-green-light); color: var(--gc-green); }
 .status-error { background: #FEF0F0; color: #B03030; }
-
-/* Step indicator */
 .upload-steps { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .step { font-size: 0.72rem; color: #B4B2A9; padding: 0.25rem 0; transition: color 0.2s; }
 .step.active { color: var(--gc-green); font-weight: 500; }
 .step.done { color: #97C459; }
-
 .skills-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .skill-chip { font-size: 0.75rem; background: var(--gc-green-light); color: var(--gc-green); padding: 4px 12px; border-radius: 20px; }
 .quant-row { padding: 0.65rem 0; border-bottom: 0.5px solid #EAF3DE; font-size: 0.8rem; color: var(--gc-muted); line-height: 1.6; }
