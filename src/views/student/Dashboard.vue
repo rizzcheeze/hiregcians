@@ -26,7 +26,6 @@
       <div class="main-header">
         <div>
           <div class="main-title">Welcome back, {{ firstName }}</div>
-          <div class="main-sub">{{ recommendedJobs.length }} new matches since your last visit</div>
         </div>
         <button class="btn-sm" @click="$router.push('/student/profile')">Update profile</button>
       </div>

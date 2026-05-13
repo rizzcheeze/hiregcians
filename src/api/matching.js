@@ -67,7 +67,26 @@ export async function getRationale(studentId, jobId) {
 }
 
 // Compute and store percentage match scores for one student across all active jobs.
+// Embeds the resume first to ensure the embedding exists before computing.
 export async function computeMatchesForStudent(studentId) {
+  // Step 1: get the student's active resume and embed it
+  const { data: resume, error: resumeErr } = await supabase
+    .from('resumes')
+    .select('id')
+    .eq('student_id', studentId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (resumeErr) throw resumeErr
+
+  if (resume?.id) {
+    const { error: embedError } = await supabase.functions.invoke('embed-resume', {
+      body: { resumeId: resume.id }
+    })
+    if (embedError) throw embedError
+  }
+
+  // Step 2: compute matches
   const { data, error } = await supabase.functions.invoke('compute-matches', {
     body: { student_id: studentId }
   })
@@ -78,7 +97,15 @@ export async function computeMatchesForStudent(studentId) {
 }
 
 // Compute and store percentage match scores for one job across all students with skills.
+// Embeds the job first to ensure the embedding exists before computing.
 export async function computeMatchesForJob(jobId) {
+  // Step 1: embed the job
+  const { error: embedError } = await supabase.functions.invoke('embed-job', {
+    body: { jobId }
+  })
+  if (embedError) throw embedError
+
+  // Step 2: compute matches
   const { data, error } = await supabase.functions.invoke('compute-matches', {
     body: { job_id: jobId }
   })

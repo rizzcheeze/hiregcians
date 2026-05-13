@@ -41,7 +41,7 @@
               <div class="form-section" style="margin-bottom:0">
                 <label class="form-label">Industry</label>
                 <select class="form-select" v-model="form.industry" @change="onIndustryChange">
-                  <option value="">Select industry (for skill suggestions)</option>
+                  <option value="">Select industry </option>
                   <option value="Software Development">Software Development</option>
                   <option value="Web & Mobile Development">Web & Mobile Development</option>
                   <option value="IT Services & Consulting">IT Services & Consulting</option>
