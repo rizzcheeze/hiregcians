@@ -2,7 +2,7 @@
   <div class="auth-container">
     <div class="left-panel">
       <div class="lp-logo">Hire <span>GCians!</span></div>
-      <img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width: 300px;" />
+      <img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width: 350px;" />
       <div class="lp-hero">
         <div class="lp-label">Platform access</div>
         <div class="lp-heading">Find roles that <em>actually</em> fit you.</div>
