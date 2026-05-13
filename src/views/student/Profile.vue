@@ -136,22 +136,31 @@
             <div class="card-title">Profile completeness</div>
             <div class="comp-ring">
               <div class="comp-num">{{ completenessPercent }}%</div>
-              <div class="comp-sub">Almost there!</div>
+              <div class="comp-sub">{{ completenessPercent === 100 ? 'Complete!' : 'Almost there!' }}</div>
             </div>
             <div class="comp-bar-bg">
               <div class="comp-bar" :style="{ width: completenessPercent + '%' }"></div>
             </div>
             <div class="checklist-row">
-              <span class="check-done">✓</span> Basic info added
+              <span :class="firstName && lastName ? 'check-done' : 'check-todo'">{{ firstName && lastName ? '✓' : '○' }}</span> Basic info added
             </div>
             <div class="checklist-row">
-              <span :class="skills.length > 0 ? 'check-done' : 'check-todo'">○</span> Skills extracted from resume
+              <span :class="avatarUrl ? 'check-done' : 'check-todo'">{{ avatarUrl ? '✓' : '○' }}</span> Profile photo uploaded
             </div>
             <div class="checklist-row">
-              <span :class="experiences.length > 0 ? 'check-done' : 'check-todo'">○</span> Experience added
+              <span :class="form.program && form.section ? 'check-done' : 'check-todo'">{{ form.program && form.section ? '✓' : '○' }}</span> Program & year level set
             </div>
             <div class="checklist-row">
-              <span :class="form.resume_url ? 'check-done' : 'check-todo'">○</span> Resume uploaded
+              <span :class="skills.length > 0 ? 'check-done' : 'check-todo'">{{ skills.length > 0 ? '✓' : '○' }}</span> Skills extracted from resume
+            </div>
+            <div class="checklist-row">
+              <span :class="experiences.length > 0 ? 'check-done' : 'check-todo'">{{ experiences.length > 0 ? '✓' : '○' }}</span> Experience added
+            </div>
+            <div class="checklist-row">
+              <span :class="form.about ? 'check-done' : 'check-todo'">{{ form.about ? '✓' : '○' }}</span> About me filled in
+            </div>
+            <div class="checklist-row">
+              <span :class="form.resume_url ? 'check-done' : 'check-todo'">{{ form.resume_url ? '✓' : '○' }}</span> Resume uploaded
             </div>
           </div>
 
@@ -167,8 +176,7 @@
               <option value="">Select program</option>
               <option value="BSCS">BSCS - Computer Science</option>
               <option value="BSIT">BSIT - Information Technology</option>
-              <option value="BSIS">BSIS - Information Systems</option>
-              <option value="Other">Other</option>
+              <option value="BSEMC">BSEMC - Entertainment and Multimedia Computing</option>
             </select>
             <label class="form-label">Section / Year Level</label>
             <select v-model="form.section" class="form-select">
@@ -217,20 +225,26 @@ const lastName = computed(() => authStore.profile?.last_name || '')
 const initials = computed(() => (firstName.value.charAt(0) || '') + (lastName.value.charAt(0) || ''))
 
 const completenessPercent = computed(() => {
-  let score = 0
-  if (firstName.value && lastName.value) score += 15
-  if (form.value.program) score += 15
-  if (form.value.section) score += 15
-  if (skills.value.length > 0) score += 20
-  if (experiences.value.length > 0) score += 20
-  if (form.value.about) score += 15
-  return Math.min(score, 100)
+  const checks = [
+    !!(firstName.value && lastName.value),
+    !!avatarUrl.value,
+    !!(form.value.program && form.value.section),
+    skills.value.length > 0,
+    experiences.value.length > 0,
+    !!form.value.about,
+    !!form.value.resume_url,
+  ]
+  const score = checks.filter(Boolean).length
+  return Math.round((score / checks.length) * 100)
 })
 
 const aiSuggestion = computed(() => {
-  if (skills.value.length === 0) return 'Upload your resume to get AI-powered skill extraction. This will help employers find you based on your actual abilities.'
+  if (!form.value.resume_url) return 'Upload your resume to get AI-powered skill extraction. This will help employers find you based on your actual abilities.'
+  if (skills.value.length === 0) return 'Your resume is uploaded but skills haven\'t been extracted yet. Go to Skills & Resume to run the AI analysis.'
+  if (!avatarUrl.value) return 'Add a profile photo so employers can put a face to your application.'
   if (experiences.value.length === 0) return "Add your experience and involvement to showcase what you've accomplished. Employers love seeing real-world projects!"
-  if (completenessPercent.value < 70) return 'Your profile looks good! Add more details to increase your match scores with potential employers.'
+  if (!form.value.about) return 'Fill in your About Me section to tell employers about yourself and your goals.'
+  if (completenessPercent.value < 100) return 'Your profile looks great! Fill in the remaining details to reach 100%.'
   return "Your profile is complete! You're ready to get matched with great opportunities."
 })
 
@@ -270,9 +284,8 @@ const handlePhotoUpload = async (event) => {
     const publicUrl = data.publicUrl + '?t=' + Date.now()
 
     const { error: dbError } = await supabase
-  .from('student_profiles')
-  .upsert({ user_id: authStore.user.id, avatar_url: data.publicUrl })
-      .eq('user_id', authStore.user.id)
+      .from('student_profiles')
+      .upsert({ user_id: authStore.user.id, avatar_url: data.publicUrl })
 
     if (dbError) throw dbError
 
@@ -297,12 +310,12 @@ const saveProfile = async () => {
   try {
     const { error } = await supabase
       .from('student_profiles')
-      .update({
+      .upsert({
+        user_id: authStore.user.id,
         program: form.value.program,
         section: form.value.section,
         about: form.value.about
       })
-      .eq('user_id', authStore.user.id)
     if (error) throw error
     alert('Profile saved successfully!')
   } catch (error) {
@@ -364,8 +377,10 @@ const saveExperiences = async () => {
     const experiencesToSave = experiences.value.map(({ editing, id, ...rest }) => rest)
     const { error } = await supabase
       .from('student_profiles')
-      .update({ experience: experiencesToSave })
-      .eq('user_id', authStore.user.id)
+      .upsert({
+        user_id: authStore.user.id,
+        experience: experiencesToSave
+      })
     if (error) throw error
   } catch (error) {
     console.error('Error saving experiences:', error)
@@ -464,7 +479,7 @@ onMounted(() => {
 .comp-num { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--gc-green); }
 .comp-sub { font-size: 0.72rem; color: var(--gc-muted); }
 .comp-bar-bg { background: #EAF3DE; border-radius: 4px; height: 8px; margin: 0.5rem 0; }
-.comp-bar { background: var(--gc-green); border-radius: 4px; height: 8px; }
+.comp-bar { background: var(--gc-green); border-radius: 4px; height: 8px; transition: width 0.4s ease; }
 .checklist-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; padding: 0.25rem 0; color: var(--gc-muted); }
 .check-done { color: var(--gc-green); font-size: 12px; }
 .check-todo { color: #D3D1C7; font-size: 12px; }
