@@ -285,7 +285,7 @@ const handlePhotoUpload = async (event) => {
 
     const { error: dbError } = await supabase
       .from('student_profiles')
-      .upsert({ user_id: authStore.user.id, avatar_url: data.publicUrl })
+      .upsert({ user_id: authStore.user.id, avatar_url: data.publicUrl }, { onConflict: 'user_id' })
 
     if (dbError) throw dbError
 
@@ -315,7 +315,7 @@ const saveProfile = async () => {
         program: form.value.program,
         section: form.value.section,
         about: form.value.about
-      })
+      }, { onConflict: 'user_id' })
     if (error) throw error
     alert('Profile saved successfully!')
   } catch (error) {
@@ -380,7 +380,7 @@ const saveExperiences = async () => {
       .upsert({
         user_id: authStore.user.id,
         experience: experiencesToSave
-      })
+      }, { onConflict: 'user_id' })
     if (error) throw error
   } catch (error) {
     console.error('Error saving experiences:', error)
