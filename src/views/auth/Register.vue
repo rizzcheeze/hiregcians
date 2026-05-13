@@ -308,8 +308,14 @@ const handleSignup = async () => {
 .auth-container { font-family: 'DM Sans', sans-serif; background: var(--gc-cream); color: var(--gc-dark); min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
 .left-panel { background: var(--gc-dark); padding: 3rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
 .left-panel::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 20%, rgba(99,153,34,0.25) 0%, transparent 60%); pointer-events: none; }
-.lp-logo { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: #C0DD97; position: relative; z-index: 1; }
-.lp-logo span { color: #97C459; }
+.lp-logo-img {
+  width: 350px;
+  margin-top: 1rem;
+  opacity: 0.9;
+  position: relative;
+  z-index: 1;
+  cursor: pointer;
+}
 .lp-hero { position: relative; z-index: 1; margin: 2rem 0; }
 .lp-label { font-size: 0.72rem; color: #97C459; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem; }
 .lp-heading { font-family: 'DM Serif Display', serif; font-size: 2.4rem; line-height: 1.2; color: #fff; margin-bottom: 1rem; }

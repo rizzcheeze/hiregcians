@@ -200,7 +200,14 @@ const handleLogin = async () => {
   pointer-events: none;
 }
 
-.lp-logo { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: #C0DD97; position: relative; z-index: 1; }
+.lp-logo-img {
+  width: 350px;
+  margin-top: 1rem;
+  opacity: 0.9;
+  position: relative;
+  z-index: 1;
+  cursor: pointer;
+}
 .lp-logo span { color: #97C459; }
 .lp-hero { position: relative; z-index: 1; margin: 2rem 0; }
 .lp-label { font-size: 0.72rem; color: #97C459; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem; }
