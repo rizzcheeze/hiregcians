@@ -1,14 +1,12 @@
 <template>
   <div class="auth-container">
     <div class="left-panel">
-    <div class="lp-logo">Hire <span>GCians!</span></div>
-    <img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width: 350px;" />
-    <div class="lp-logo" @click="$router.push('/')" style="cursor:pointer">Hire <span>GCians!</span></div>
-<img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width:100px;cursor:pointer" @click="$router.push('/')" />
+   <div class="lp-logo" @click="$router.push('/')" style="cursor:pointer">Hire <span>GCians!</span></div>
+<img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width:350px;cursor:pointer" @click="$router.push('/')" />
       <div class="lp-hero">
         <div class="lp-label">Gordon College CCS</div>
         <div class="lp-heading">Find roles that <em>actually</em> fit you.</div>
-        <div class="lp-sub">Built for CCS students. Connect with localemployers, showcase your skills, and land opportunities that match your path.</div>
+        <div class="lp-sub">Built for CCS students. Connect with local employers, showcase your skills, and land opportunities that match your path.</div>
         <div class="lp-cards">
           <div class="lp-card">
             <div class="lp-card-dot"></div>

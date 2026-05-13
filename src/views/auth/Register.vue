@@ -1,10 +1,8 @@
 <template>
   <div class="auth-container">
     <div class="left-panel">
-      <div class="lp-logo">Hire <span>GCians!</span></div>
-      <img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width: 350px;" />
       <div class="lp-logo" @click="$router.push('/')" style="cursor:pointer">Hire <span>GCians!</span></div>
-<img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width:100px;cursor:pointer" @click="$router.push('/')" />
+<img src="/logo.png" alt="Hire GCians logo" class="lp-logo-img" style="width:350px;cursor:pointer" @click="$router.push('/')" />
       <div class="lp-hero">
         <div class="lp-label">Gordon College CCS</div>
         <div class="lp-heading">Find roles that <em>actually</em> fit you.</div>
