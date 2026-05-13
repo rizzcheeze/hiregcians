@@ -34,7 +34,7 @@
       <div class="metrics">
         <div class="metric">
           <div class="metric-val">{{ recommendedJobs.length }}</div>
-          <div class="metric-label">Recommended jobs</div>
+          <div class="metric-label">Recently Posted Job</div>
         </div>
         <div class="metric">
           <div class="metric-val">{{ applicationsCount }}</div>

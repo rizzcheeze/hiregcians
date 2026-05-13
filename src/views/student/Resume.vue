@@ -80,11 +80,6 @@
             <div class="ai-tip-label">Recruiter readiness</div>
             <div class="ai-tip-body">{{ recruiterTip }}</div>
           </div>
-
-          <div class="card">
-            <div class="card-title">Public profile preview</div>
-            <button class="btn-outline" style="width:100%" @click="$router.push('/student/public-profile')">Open public profile</button>
-          </div>
         </div>
       </div>
     </main>
