@@ -36,7 +36,6 @@
 
         <div class="auth-heading">Welcome back</div>
 
-        <!-- Login type toggle -->
         <div class="role-selector">
           <div class="role-card" :class="{ selected: loginType === 'student' }" @click="loginType = 'student'">
             <div class="role-title">Student</div>
@@ -58,12 +57,10 @@
               type="text"
               inputmode="numeric"
               maxlength="9"
+              placeholder="000000000"
               @input="studentId = studentId.replace(/\D/g, '').slice(0, 9)"
             />
-            <span class="pw-toggle" @click="showPassword = !showPassword">
-              {{ showPassword ? 'Hide' : 'Show' }}
-            </span>
-            <span class="id-suffix">                              @gordoncollege.edu.ph</span>
+            <span class="id-suffix">@gordoncollege.edu.ph</span>
           </div>
           <div v-if="studentId.length > 0 && studentId.length < 9" class="field-hint">
             {{ 9 - studentId.length }} more digit{{ studentId.length === 8 ? '' : 's' }} needed
@@ -77,7 +74,19 @@
         </template>
 
         <label class="form-label">Password</label>
-        <input class="form-input" v-model="form.password" type="password" placeholder="••••••••" @keyup.enter="handleLogin" />
+        <div class="password-wrapper">
+          <input
+            class="form-input"
+            v-model="form.password"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder=""
+            style="margin-bottom: 0; padding-right: 3.5rem;"
+            @keyup.enter="handleLogin"
+          />
+          <span class="pw-toggle" @click="showPassword = !showPassword">
+            {{ showPassword ? 'Hide' : 'Show' }}
+          </span>
+        </div>
 
         <p v-if="error" class="error-message">{{ error }}</p>
 
@@ -109,6 +118,7 @@ const studentId = ref('')
 const form = ref({ email: '', password: '' })
 const loading = ref(false)
 const error = ref('')
+const showPassword = ref(false)
 
 const resolvedEmail = computed(() => {
   if (loginType.value === 'student') {
@@ -222,12 +232,42 @@ const handleLogin = async () => {
 .form-input { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; margin-bottom: 1rem; transition: border-color 0.15s; }
 .form-input:focus { border-color: var(--gc-green); }
 
-.id-input-wrapper { display: flex; align-items: center; border: 0.5px solid #C0DD97; border-radius: 8px; background: #fff; margin-bottom: 0.5rem; overflow: hidden; transition: border-color 0.15s; }
+.id-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 0.5px solid #C0DD97;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
 .id-input-wrapper:focus-within { border-color: var(--gc-green); }
-.id-input { border: none; margin-bottom: 0; border-radius: 0; flex: 0 0 auto; width: 7rem; }
-.id-suffix { font-size: 0.78rem; color: var(--gc-muted); padding-right: 0.75rem; white-space: nowrap; }
+.id-input {
+  border: none;
+  margin-bottom: 0;
+  border-radius: 0;
+  flex: 1;
+  min-width: 0;
+}
+.id-suffix {
+  font-size: 0.78rem;
+  color: var(--gc-muted);
+  padding: 0 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-left: 0.5px solid #EAF3DE;
+  background: #FAFAF7;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  line-height: 2.4rem;
+}
 
 .field-hint { font-size: 0.7rem; color: var(--gc-muted); margin-bottom: 0.75rem; }
+
+.password-wrapper { position: relative; margin-bottom: 1rem; }
+.pw-toggle { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 0.75rem; color: var(--gc-muted); user-select: none; }
 
 .btn-full { width: 100%; background: var(--gc-green); color: #fff; border: none; border-radius: 20px; padding: 0.7rem; font-size: 0.9rem; font-family: 'DM Serif Display', serif; cursor: pointer; transition: opacity 0.15s; margin-top: 0.5rem; }
 .btn-full:hover { opacity: 0.9; }

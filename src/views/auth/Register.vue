@@ -81,9 +81,10 @@
                 type="text"
                 inputmode="numeric"
                 maxlength="9"
+                placeholder="000000000"
                 @input="studentId = studentId.replace(/\D/g, '').slice(0, 9)"
               />
-              <span class="id-suffix">                              @gordoncollege.edu.ph</span>
+              <span class="id-suffix">@gordoncollege.edu.ph</span>
             </div>
             <div v-if="studentId.length > 0 && studentId.length < 9" class="field-hint">
               {{ 9 - studentId.length }} more digit{{ studentId.length === 8 ? '' : 's' }} needed
@@ -133,8 +134,8 @@
               class="form-input"
               v-model="signupForm.password"
               :type="showPassword ? 'text' : 'password'"
-              placeholder="At least 8 characters"
-              style="margin-bottom: 0.5rem; padding-right: 2.5rem;"
+              placeholder=""
+              style="margin-bottom: 0.5rem; padding-right: 3.5rem;"
             />
             <span class="pw-toggle" @click="showPassword = !showPassword">
               {{ showPassword ? 'Hide' : 'Show' }}
@@ -347,10 +348,35 @@ const handleSignup = async () => {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .form-select { width: 100%; border: 0.5px solid #C0DD97; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--gc-dark); background: #fff; outline: none; margin-bottom: 1rem; }
 
-.id-input-wrapper { display: flex; align-items: center; border: 0.5px solid #C0DD97; border-radius: 8px; background: #fff; margin-bottom: 0.5rem; overflow: hidden; transition: border-color 0.15s; }
+.id-input-wrapper {
+  display: flex;
+  align-items: stretch;
+  border: 0.5px solid #C0DD97;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
 .id-input-wrapper:focus-within { border-color: var(--gc-green); }
-.id-input { border: none; margin-bottom: 0; border-radius: 0; flex: 0 0 auto; width: 7rem; }
-.id-suffix { font-size: 0.78rem; color: var(--gc-muted); padding-right: 0.75rem; white-space: nowrap; }
+.id-input {
+  border: none;
+  margin-bottom: 0;
+  border-radius: 0;
+  flex: 1;
+  min-width: 0;
+}
+.id-suffix {
+  font-size: 0.78rem;
+  color: var(--gc-muted);
+  padding: 0 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-left: 0.5px solid #EAF3DE;
+  background: #FAFAF7;
+  display: flex;
+  align-items: center;
+}
 
 .field-hint { font-size: 0.7rem; color: var(--gc-muted); margin-bottom: 0.75rem; }
 

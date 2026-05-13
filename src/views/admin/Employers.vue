@@ -31,7 +31,7 @@
       <div class="main-header">
         <div>
           <div class="page-title">Employers</div>
-          <div class="page-sub">Management and participation metrics for external hiring partners</div>
+          <div class="page-sub">Management and participation metrics for hiring partners</div>
         </div>
         <div class="live-badge"><div class="live-dot"></div> System Live</div>
       </div>
