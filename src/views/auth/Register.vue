@@ -81,10 +81,9 @@
                 type="text"
                 inputmode="numeric"
                 maxlength="9"
-                placeholder="000000000"
                 @input="studentId = studentId.replace(/\D/g, '').slice(0, 9)"
               />
-              <span class="id-suffix">@gordoncollege.edu.ph</span>
+              <span class="id-suffix">                              @gordoncollege.edu.ph</span>
             </div>
             <div v-if="studentId.length > 0 && studentId.length < 9" class="field-hint">
               {{ 9 - studentId.length }} more digit{{ studentId.length === 8 ? '' : 's' }} needed
@@ -106,7 +105,7 @@
                   <option value="">Select program</option>
                   <option value="BSCS">BSCS - Computer Science</option>
                   <option value="BSIT">BSIT - Information Technology</option>
-                  <option value="BSIS">BSIS - Information Systems</option>
+                  <option value="BSEMC">BSEMC - Entertainment and Multimedia Computing</option>
                 </select>
               </div>
               <div>
@@ -125,7 +124,7 @@
           <!-- Employer Extras -->
           <div v-if="signupRole === 'employer'">
             <label class="form-label">Company name</label>
-            <input class="form-input" v-model="signupForm.company_name" placeholder="Your company name" />
+            <input class="form-input" v-model="signupForm.company_name" placeholder="Company name" />
           </div>
 
           <label class="form-label">Password</label>

@@ -40,7 +40,7 @@
         <div class="role-selector">
           <div class="role-card" :class="{ selected: loginType === 'student' }" @click="loginType = 'student'">
             <div class="role-title">Student</div>
-            <div class="role-sub">GC email login</div>
+            <div class="role-sub">GC domain</div>
           </div>
           <div class="role-card" :class="{ selected: loginType === 'other' }" @click="loginType = 'other'">
             <div class="role-title">Employer / Admin</div>
@@ -58,10 +58,12 @@
               type="text"
               inputmode="numeric"
               maxlength="9"
-              placeholder="000000000"
               @input="studentId = studentId.replace(/\D/g, '').slice(0, 9)"
             />
-            <span class="id-suffix">@gordoncollege.edu.ph</span>
+            <span class="pw-toggle" @click="showPassword = !showPassword">
+              {{ showPassword ? 'Hide' : 'Show' }}
+            </span>
+            <span class="id-suffix">                              @gordoncollege.edu.ph</span>
           </div>
           <div v-if="studentId.length > 0 && studentId.length < 9" class="field-hint">
             {{ 9 - studentId.length }} more digit{{ studentId.length === 8 ? '' : 's' }} needed
@@ -71,7 +73,7 @@
         <!-- Employer/Admin login -->
         <template v-else>
           <label class="form-label">Email</label>
-          <input class="form-input" v-model="form.email" type="email" placeholder="yourname@example.com" />
+          <input class="form-input" v-model="form.email" type="email" placeholder="yourcompany@example.com" />
         </template>
 
         <label class="form-label">Password</label>
